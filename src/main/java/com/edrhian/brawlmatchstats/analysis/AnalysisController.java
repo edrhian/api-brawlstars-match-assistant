@@ -33,6 +33,20 @@ public class AnalysisController {
         return analysisService.analyzeEnemyBrawlers(request.toFilter(), request.minGamesOrDefault());
     }
 
+    // Which Brawlers work well together with the given ones (brawlers=SHELLY&brawlers=COLT)
+    @GetMapping("/ally-synergy")
+    public InputAnalysisResponse allySynergy(AnalysisRequest request, @RequestParam List<String> brawlers) {
+        return analysisService.analyzeAllySynergy(
+                request.toFilter(), AnalysisRequest.cleanBrawlers(brawlers), request.minGamesOrDefault());
+    }
+
+    // Which of our picks work well against the given enemy Brawlers (brawlers=BROCK&brawlers=CARL)
+    @GetMapping("/enemy-counters")
+    public InputAnalysisResponse enemyCounters(AnalysisRequest request, @RequestParam List<String> brawlers) {
+        return analysisService.analyzeEnemyCounters(
+                request.toFilter(), AnalysisRequest.cleanBrawlers(brawlers), request.minGamesOrDefault());
+    }
+
     // Values that exist in the database, to fill the filter selectors
     @GetMapping("/filter-options")
     public FilterOptionsResponse filterOptions(@RequestParam List<String> players) {

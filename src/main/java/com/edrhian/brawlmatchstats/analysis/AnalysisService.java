@@ -19,7 +19,7 @@ import java.util.NoSuchElementException;
  * 1. findBattles: the database applies all the filters (the "filtered battles").
  * 2. a calculator counts the results of those battles.
  *
- * New analyses (ally synergy, counters...) can reuse step 1 and add their own calculator.
+ * Every analysis reuses step 1 and only changes the calculator.
  */
 @Service
 public class AnalysisService {
@@ -51,6 +51,32 @@ public class AnalysisService {
         return new BrawlerAnalysisResponse(
                 BrawlerStatsCalculator.overall(battles),
                 BrawlerStatsCalculator.enemyBrawlers(battles, minGames));
+    }
+
+    /**
+     * Ally synergy: results of each partner Brawler in the battles where all the input Brawlers
+     * were in the ally team. "withInput" is the result of those battles without looking at partners.
+     */
+    public InputAnalysisResponse analyzeAllySynergy(BattleFilter filter, List<String> brawlers, int minGames) {
+        List<Battle> battles = findBattles(filter);
+        return new InputAnalysisResponse(
+                brawlers,
+                BrawlerStatsCalculator.overall(battles),
+                BrawlerStatsCalculator.overall(BrawlerStatsCalculator.withAllyBrawlers(battles, brawlers)),
+                BrawlerStatsCalculator.allyPartners(battles, brawlers, minGames));
+    }
+
+    /**
+     * Counter analysis: results of each ally pick in the battles where all the input Brawlers
+     * were in the enemy team. "withInput" is the result of those battles without looking at picks.
+     */
+    public InputAnalysisResponse analyzeEnemyCounters(BattleFilter filter, List<String> brawlers, int minGames) {
+        List<Battle> battles = findBattles(filter);
+        return new InputAnalysisResponse(
+                brawlers,
+                BrawlerStatsCalculator.overall(battles),
+                BrawlerStatsCalculator.overall(BrawlerStatsCalculator.withEnemyBrawlers(battles, brawlers)),
+                BrawlerStatsCalculator.countersAgainst(battles, brawlers, minGames));
     }
 
     /**

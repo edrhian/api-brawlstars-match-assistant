@@ -5,6 +5,7 @@ import com.edrhian.brawlmatchstats.shared.TagUtils;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Locale;
 
 /**
  * The query parameters of the analysis endpoints, exactly as they arrive.
@@ -74,6 +75,19 @@ public record AnalysisRequest(
             throw new IllegalArgumentException("At least one player is required, for example players=2VU8PGCC");
         }
         return tags;
+    }
+
+    // Brawler names as the API writes them (uppercase), 1 to 3 different ones
+    static List<String> cleanBrawlers(List<String> rawBrawlers) {
+        List<String> brawlers = cleanText(rawBrawlers).stream()
+                .map(name -> name.toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        if (brawlers.isEmpty() || brawlers.size() > 3) {
+            throw new IllegalArgumentException(
+                    "Choose between 1 and 3 different brawlers, for example brawlers=SHELLY");
+        }
+        return brawlers;
     }
 
     private static List<String> cleanText(List<String> values) {

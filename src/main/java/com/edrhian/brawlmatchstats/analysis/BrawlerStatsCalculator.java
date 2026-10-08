@@ -19,6 +19,7 @@ import java.util.function.Function;
  *
  * A Brawler counts once per battle, even if it appears twice in the same team.
  * Battles without a known result (victory, defeat, draw) are ignored.
+ * Brawler names are compared ignoring upper and lower case.
  */
 public final class BrawlerStatsCalculator {
 
@@ -34,15 +35,50 @@ public final class BrawlerStatsCalculator {
         return StatsDto.of(tally.wins, tally.losses, tally.draws);
     }
 
+    // ---------- Part 1: results of each Brawler ----------
+
     public static List<BrawlerStatsDto> allyBrawlers(List<Battle> battles, int minGames) {
-        return byBrawler(battles, minGames,
-                battle -> Arrays.asList(battle.getAlly1Brawler(), battle.getAlly2Brawler(), battle.getAlly3Brawler()));
+        return byBrawler(battles, minGames, BrawlerStatsCalculator::allyBrawlersOf);
     }
 
     public static List<BrawlerStatsDto> enemyBrawlers(List<Battle> battles, int minGames) {
-        return byBrawler(battles, minGames,
-                battle -> Arrays.asList(battle.getEnemy1Brawler(), battle.getEnemy2Brawler(), battle.getEnemy3Brawler()));
+        return byBrawler(battles, minGames, BrawlerStatsCalculator::enemyBrawlersOf);
     }
+
+    // ---------- Part 3: results depending on an input of Brawlers ----------
+
+    // The battles where ALL these Brawlers were in the ally team
+    public static List<Battle> withAllyBrawlers(List<Battle> battles, List<String> brawlers) {
+        return battles.stream().filter(battle -> containsAll(allyBrawlersOf(battle), brawlers)).toList();
+    }
+
+    // The battles where ALL these Brawlers were in the enemy team
+    public static List<Battle> withEnemyBrawlers(List<Battle> battles, List<String> brawlers) {
+        return battles.stream().filter(battle -> containsAll(enemyBrawlersOf(battle), brawlers)).toList();
+    }
+
+    /**
+     * Ally synergy. Takes the battles that have all the input Brawlers in the ally team and
+     * counts each other ally Brawler separately: with input SHELLY, a battle of SHELLY + COLT + SPIKE
+     * counts for [SHELLY + COLT] and also for [SHELLY + SPIKE], and COLT + SPIKE is not a fixed pair.
+     */
+    public static List<BrawlerStatsDto> allyPartners(List<Battle> battles, List<String> inputBrawlers, int minGames) {
+        return byBrawler(withAllyBrawlers(battles, inputBrawlers), minGames,
+                battle -> allyBrawlersOf(battle).stream()
+                        .filter(brawler -> brawler != null && !containsIgnoreCase(inputBrawlers, brawler))
+                        .toList());
+    }
+
+    /**
+     * Counter analysis. Takes the battles that have all the input Brawlers in the enemy team and
+     * counts each ally Brawler separately: how well each pick does against them.
+     */
+    public static List<BrawlerStatsDto> countersAgainst(List<Battle> battles, List<String> inputEnemies, int minGames) {
+        return byBrawler(withEnemyBrawlers(battles, inputEnemies), minGames,
+                BrawlerStatsCalculator::allyBrawlersOf);
+    }
+
+    // ---------- Helpers ----------
 
     // Most played first, and alphabetical when there is a tie
     private static List<BrawlerStatsDto> byBrawler(List<Battle> battles, int minGames,
@@ -65,6 +101,23 @@ public final class BrawlerStatsCalculator {
                 .sorted(Comparator.comparingInt(BrawlerStatsDto::games).reversed()
                         .thenComparing(BrawlerStatsDto::brawler))
                 .toList();
+    }
+
+    // The list can contain nulls when a slot is empty
+    private static List<String> allyBrawlersOf(Battle battle) {
+        return Arrays.asList(battle.getAlly1Brawler(), battle.getAlly2Brawler(), battle.getAlly3Brawler());
+    }
+
+    private static List<String> enemyBrawlersOf(Battle battle) {
+        return Arrays.asList(battle.getEnemy1Brawler(), battle.getEnemy2Brawler(), battle.getEnemy3Brawler());
+    }
+
+    private static boolean containsAll(List<String> team, List<String> wanted) {
+        return wanted.stream().allMatch(name -> containsIgnoreCase(team, name));
+    }
+
+    private static boolean containsIgnoreCase(List<String> names, String name) {
+        return names.stream().anyMatch(other -> other != null && other.equalsIgnoreCase(name));
     }
 
     // Counter of results
