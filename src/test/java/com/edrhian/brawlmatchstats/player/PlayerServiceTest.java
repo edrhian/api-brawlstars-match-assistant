@@ -19,6 +19,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,16 +43,16 @@ class PlayerServiceTest {
         service = new PlayerService(playerRepository, brawlStarsClient);
         // save() returns the same player it receives
         when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(brawlStarsClient.getPlayer(TAG))
+                .thenReturn(new BrawlStarsPlayerResponse(TAG, "edrhian27", 111557, "LEGENDARY I"));
     }
+
+    // ---------- Register ----------
 
     @Test
     void registersNewPlayerWithDataFromApi() {
-        when(playerRepository.findById(TAG)).thenReturn(Optional.empty());
-        when(brawlStarsClient.getPlayer(TAG))
-                .thenReturn(new BrawlStarsPlayerResponse(TAG, "edrhian27", 111557, "LEGENDARY I"));
-
         // Lowercase tag without "#" and a repeated type
-        PlayerDto dto = service.registerPlayer("2vu8pgcc",
+        PlayerDto dto = service.registerPlayer("2vu8pgcc", true,
                 List.of(BattleType.ranked, BattleType.soloRanked, BattleType.ranked));
 
         assertThat(dto.tag()).isEqualTo(TAG);
@@ -61,6 +63,35 @@ class PlayerServiceTest {
         assertThat(dto.trackingTypes()).containsExactly(BattleType.ranked, BattleType.soloRanked);
         assertThat(dto.lastUpdated()).matches(TIME_FORMAT);
     }
+
+    @Test
+    void registersWithTrackingEnabledAndAllTypesWhenNothingIsGiven() {
+        PlayerDto dto = service.registerPlayer(TAG, null, null);
+
+        assertThat(dto.trackingEnabled()).isTrue();
+        assertThat(dto.trackingTypes())
+                .containsExactly(BattleType.ranked, BattleType.soloRanked, BattleType.friendly);
+    }
+
+    @Test
+    void registersWithTrackingDisabledWhenAsked() {
+        PlayerDto dto = service.registerPlayer(TAG, false, null);
+
+        assertThat(dto.trackingEnabled()).isFalse();
+    }
+
+    @Test
+    void registerThrowsWhenPlayerAlreadyExists() {
+        when(playerRepository.existsById(TAG)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.registerPlayer(TAG, null, null))
+                .isInstanceOf(PlayerAlreadyExistsException.class)
+                .hasMessageContaining(TAG);
+        verify(brawlStarsClient, never()).getPlayer(any());
+        verify(playerRepository, never()).save(any());
+    }
+
+    // ---------- Refresh ----------
 
     @Test
     void refreshUpdatesNameTrophiesAndRank() {
@@ -89,14 +120,50 @@ class PlayerServiceTest {
                 .hasMessageContaining(TAG);
     }
 
+    // ---------- Tracking ----------
+
     @Test
-    void updatesTracking() {
+    void enablesAndDisablesTracking() {
         when(playerRepository.findById(TAG)).thenReturn(Optional.of(player(true, BattleType.ranked)));
 
-        PlayerDto dto = service.updateTracking(TAG, false, List.of(BattleType.friendly));
+        assertThat(service.setTrackingEnabled(TAG, false).trackingEnabled()).isFalse();
+        assertThat(service.setTrackingEnabled(TAG, true).trackingEnabled()).isTrue();
+    }
 
-        assertThat(dto.trackingEnabled()).isFalse();
-        assertThat(dto.trackingTypes()).containsExactly(BattleType.friendly);
+    @Test
+    void changesTrackingTypesWithoutTouchingEnabledFlag() {
+        when(playerRepository.findById(TAG)).thenReturn(Optional.of(player(true, BattleType.ranked)));
+
+        PlayerDto dto = service.setTrackingTypes(TAG, List.of(BattleType.friendly, BattleType.soloRanked));
+
+        assertThat(dto.trackingTypes()).containsExactly(BattleType.friendly, BattleType.soloRanked);
+        assertThat(dto.trackingEnabled()).isTrue();
+    }
+
+    @Test
+    void trackingChangesThrowWhenPlayerIsNotRegistered() {
+        when(playerRepository.findById(TAG)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.setTrackingEnabled(TAG, true))
+                .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> service.setTrackingTypes(TAG, List.of(BattleType.ranked)))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    // ---------- Read ----------
+
+    @Test
+    void getsOnePlayer() {
+        when(playerRepository.findById(TAG)).thenReturn(Optional.of(player(true, BattleType.ranked)));
+
+        assertThat(service.getPlayer("2vu8pgcc").tag()).isEqualTo(TAG);
+    }
+
+    @Test
+    void getsAllPlayers() {
+        when(playerRepository.findAll()).thenReturn(List.of(player(true, BattleType.ranked), player(false)));
+
+        assertThat(service.getAllPlayers()).hasSize(2);
     }
 
     @Test

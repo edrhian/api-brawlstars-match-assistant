@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
- * Registers players and keeps their profile data (name, trophies, rank) up to date.
+ * Registers players and keeps their profile data (name, trophies, rank) and tracking settings.
  */
 @Service
 public class PlayerService {
@@ -26,17 +26,24 @@ public class PlayerService {
     }
 
     /**
-     * Registers a player (or updates it if it already exists) with tracking enabled.
-     * The tag is checked against the BrawlStars API, so a wrong tag fails here.
+     * Adds a new player. The tag is checked against the BrawlStars API, so a wrong tag fails here.
+     *
+     * @param trackingEnabled null means enabled
+     * @param trackingTypes   null means all the battle types
+     * @throws PlayerAlreadyExistsException if the player is already registered
      */
-    public PlayerDto registerPlayer(String tag, List<BattleType> trackingTypes) {
+    public PlayerDto registerPlayer(String tag, Boolean trackingEnabled, List<BattleType> trackingTypes) {
         String cleanTag = TagUtils.normalize(tag);
+        if (playerRepository.existsById(cleanTag)) {
+            throw new PlayerAlreadyExistsException(cleanTag);
+        }
+
         BrawlStarsPlayerResponse response = brawlStarsClient.getPlayer(cleanTag);
 
-        Player player = playerRepository.findById(cleanTag).orElseGet(Player::new);
+        Player player = new Player();
         player.setTag(cleanTag);
-        player.setTrackingEnabled(true);
-        player.setTrackingTypes(cleanTypes(trackingTypes));
+        player.setTrackingEnabled(trackingEnabled == null || trackingEnabled);
+        player.setTrackingTypes(trackingTypes == null ? allTypes() : cleanTypes(trackingTypes));
         applyApiData(player, response);
 
         return PlayerMapper.toDto(playerRepository.save(player));
@@ -52,9 +59,15 @@ public class PlayerService {
         return PlayerMapper.toDto(playerRepository.save(player));
     }
 
-    public PlayerDto updateTracking(String tag, boolean trackingEnabled, List<BattleType> trackingTypes) {
+    public PlayerDto setTrackingEnabled(String tag, boolean trackingEnabled) {
         Player player = findPlayerOrThrow(tag);
         player.setTrackingEnabled(trackingEnabled);
+
+        return PlayerMapper.toDto(playerRepository.save(player));
+    }
+
+    public PlayerDto setTrackingTypes(String tag, List<BattleType> trackingTypes) {
+        Player player = findPlayerOrThrow(tag);
         player.setTrackingTypes(cleanTypes(trackingTypes));
 
         return PlayerMapper.toDto(playerRepository.save(player));
@@ -87,6 +100,10 @@ public class PlayerService {
         player.setTrophies(response.trophies());
         player.setRankedRank(response.rankedRankName());
         player.setLastUpdated(TimeUtils.nowAsString());
+    }
+
+    private List<BattleType> allTypes() {
+        return new ArrayList<>(List.of(BattleType.values()));
     }
 
     // Removes repeated types and never leaves a null list

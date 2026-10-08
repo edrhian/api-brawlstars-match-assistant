@@ -6,13 +6,18 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Index;
 
 /**
  * One battle seen from the point of view of Ally 1 (the tracked player).
  * This class is the "BATTLES" table.
  */
 @Entity
-@Table(name = "battles")
+@Table(name = "battles", indexes = {
+        @Index(name = "idx_battles_ally1_time", columnList = "ally1, battleTime"),
+        @Index(name = "idx_battles_ally2_time", columnList = "ally2, battleTime"),
+        @Index(name = "idx_battles_ally3_time", columnList = "ally3, battleTime")
+})
 public class Battle {
 
     // BrawlStars battles have no ID, so we build one: battleTime + "_" + ally1
