@@ -1,18 +1,15 @@
 package com.edrhian.brawlmatchstats.analysis;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
  * Battle analysis endpoints. The filters are query parameters (see AnalysisRequest),
- * and players (tags without "#") is the only required one.
  */
 @RestController
 @RequestMapping("/analysis")
+@CrossOrigin(origins = "*")
 public class AnalysisController {
 
     private final AnalysisService analysisService;
@@ -49,7 +46,9 @@ public class AnalysisController {
 
     // Values that exist in the database, to fill the filter selectors
     @GetMapping("/filter-options")
-    public FilterOptionsResponse filterOptions(@RequestParam List<String> players) {
-        return analysisService.getFilterOptions(players);
+    public FilterOptionsResponse filterOptions(AnalysisRequest request) {
+        // Extract players and the allPlayers flag from the request
+        BattleFilter filter = request.toFilter();
+        return analysisService.getFilterOptions(filter.players(), filter.allPlayers());
     }
 }

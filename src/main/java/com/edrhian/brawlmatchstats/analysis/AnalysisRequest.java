@@ -15,6 +15,7 @@ import java.util.Locale;
  */
 public record AnalysisRequest(
         List<String> players,
+        Boolean allPlayers,
         List<BattleType> battleTypes,
         List<String> ranks,
         Integer trophiesMin,
@@ -31,6 +32,11 @@ public record AnalysisRequest(
      * @throws IllegalArgumentException if something is wrong (it becomes a 400 error)
      */
     public BattleFilter toFilter() {
+        boolean isAllPlayers = Boolean.TRUE.equals(allPlayers);
+
+        // If allPlayers is true, skip validation
+        List<String> normalizedPlayers = isAllPlayers ? List.of() : normalizeTags(players);
+
         if (limit != null && limit < 1) {
             throw new IllegalArgumentException("limit must be 1 or more");
         }
@@ -45,7 +51,8 @@ public record AnalysisRequest(
         }
 
         return new BattleFilter(
-                normalizeTags(players),
+                normalizedPlayers,
+                isAllPlayers,
                 cleanTypes(battleTypes),
                 cleanText(ranks),
                 trophiesMin,
@@ -71,9 +78,8 @@ public record AnalysisRequest(
     // Tags in the same way we store them (#2VU8PGCC), without repeated or empty ones
     static List<String> normalizeTags(List<String> rawTags) {
         List<String> tags = cleanText(rawTags).stream().map(TagUtils::normalize).distinct().toList();
-        if (tags.isEmpty()) {
-            throw new IllegalArgumentException("At least one player is required, for example players=2VU8PGCC");
-        }
+        // Empty = all players
+
         return tags;
     }
 

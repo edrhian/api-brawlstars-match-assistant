@@ -82,9 +82,18 @@ public class AnalysisService {
     /**
      * Existing values of the database for some players (all their battles, without other filters).
      */
-    public FilterOptionsResponse getFilterOptions(List<String> players) {
-        List<String> tags = AnalysisRequest.normalizeTags(players);
-        requireRegistered(tags);
+    public FilterOptionsResponse getFilterOptions(List<String> players, boolean allPlayers) {
+        List<String> tags;
+        if (allPlayers) {
+            // Fetch all registered player tags from the database
+            tags = playerRepository.findAll().stream().map(Player::getTag).toList();
+            if (tags.isEmpty()) {
+                throw new NoSuchElementException("No players registered in the database");
+            }
+        } else {
+            tags = AnalysisRequest.normalizeTags(players);
+            requireRegistered(tags);
+        }
 
         BattleRange range = battleRepository.findRangeByPlayers(tags);
         return new FilterOptionsResponse(
@@ -103,7 +112,10 @@ public class AnalysisService {
      * battles are taken from the battles that already passed the other filters.
      */
     public List<Battle> findBattles(BattleFilter filter) {
-        requireRegistered(filter.players());
+        // Only validate specific players if we are not querying all players
+        if (!filter.allPlayers()) {
+            requireRegistered(filter.players());
+        }
 
         Specification<Battle> specification = BattleSpecifications.matching(filter);
         if (filter.limit() == null) {
@@ -116,6 +128,10 @@ public class AnalysisService {
     }
 
     private void requireRegistered(List<String> tags) {
+        // If tags are null or empty, we skip validation
+        if (tags == null || tags.isEmpty()) {
+            return;
+        }
         List<String> registered = playerRepository.findAllById(tags).stream().map(Player::getTag).toList();
         List<String> missing = tags.stream().filter(tag -> !registered.contains(tag)).toList();
         if (!missing.isEmpty()) {

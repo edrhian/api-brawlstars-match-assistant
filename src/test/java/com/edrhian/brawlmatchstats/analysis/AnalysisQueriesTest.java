@@ -187,7 +187,7 @@ class AnalysisQueriesTest {
         other.setMap("Other Map");
         battleRepository.saveAll(List.of(first, second, other));
 
-        FilterOptionsResponse options = service.getFilterOptions(List.of("a"));
+        FilterOptionsResponse options = service.getFilterOptions(List.of("a"), false);
 
         assertThat(options.battleTypes()).containsExactly(BattleType.ranked, BattleType.soloRanked);
         assertThat(options.ranks()).containsExactly("LEGENDARY I", "MASTERS I");
@@ -201,7 +201,7 @@ class AnalysisQueriesTest {
 
     @Test
     void filterOptionsAreEmptyWhenThePlayerHasNoBattles() {
-        FilterOptionsResponse options = service.getFilterOptions(List.of("#B"));
+        FilterOptionsResponse options = service.getFilterOptions(List.of("#B"), false);
 
         assertThat(options.battleTypes()).isEmpty();
         assertThat(options.ranks()).isEmpty();
@@ -298,7 +298,7 @@ class AnalysisQueriesTest {
         }
 
         BattleFilter build() {
-            return new BattleFilter(players, types, ranks, trophiesMin, trophiesMax, modes, maps, from, to, limit);
+            return new BattleFilter(players,false ,types, ranks, trophiesMin, trophiesMax, modes, maps, from, to, limit);
         }
     }
 }

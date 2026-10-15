@@ -23,10 +23,12 @@ public final class BattleSpecifications {
             List<Predicate> conditions = new ArrayList<>();
 
             // 1. Players: a battle counts if the player is Ally 1, 2 or 3 (never as enemy)
-            conditions.add(cb.or(
-                    root.get("ally1").in(filter.players()),
-                    root.get("ally2").in(filter.players()),
-                    root.get("ally3").in(filter.players())));
+            if (!filter.allPlayers()) {
+                conditions.add(cb.or(
+                        root.get("ally1").in(filter.players()),
+                        root.get("ally2").in(filter.players()),
+                        root.get("ally3").in(filter.players())));
+            }
 
             // 2. Battle type
             if (!filter.battleTypes().isEmpty()) {

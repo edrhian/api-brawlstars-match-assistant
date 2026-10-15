@@ -46,7 +46,7 @@ class AnalysisInputControllerTest {
                 .andExpect(jsonPath("$.brawlers[0].brawler").value("SPIKE"))
                 .andExpect(jsonPath("$.brawlers[0].winrate").value(100.0));
 
-        BattleFilter expected = new BattleFilter(List.of("#2VU8PGCC"), List.of(), List.of(), null, null,
+        BattleFilter expected = new BattleFilter(List.of("#2VU8PGCC"), false, List.of(), List.of(), null, null,
                 List.of(), List.of(), null, null, 100);
         verify(analysisService).analyzeAllySynergy(expected, List.of("SHELLY", "COLT"), 1);
     }
@@ -69,7 +69,7 @@ class AnalysisInputControllerTest {
                 .andExpect(jsonPath("$.brawlers[0].brawler").value("COLT"));
 
         verify(analysisService).analyzeEnemyCounters(
-                new BattleFilter(List.of("#2VU8PGCC"), List.of(), List.of(), null, null,
+                new BattleFilter(List.of("#2VU8PGCC"), false, List.of(), List.of(), null, null,
                         List.of(), List.of(), null, null, null),
                 List.of("BROCK"), 3);
     }

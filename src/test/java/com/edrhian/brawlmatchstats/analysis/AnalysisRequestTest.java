@@ -20,7 +20,7 @@ class AnalysisRequestTest {
 
     @Test
     void missingOptionalFiltersBecomeEmpty() {
-        BattleFilter filter = new AnalysisRequest(List.of("#A"), null, Arrays.asList("LEGENDARY I", " ", null),
+        BattleFilter filter = new AnalysisRequest(List.of("#A"), false, null, Arrays.asList("LEGENDARY I", " ", null),
                 null, null, null, List.of(""), null, null, null, null).toFilter();
 
         assertThat(filter.battleTypes()).isEmpty();
@@ -34,7 +34,7 @@ class AnalysisRequestTest {
 
     @Test
     void keepsTheValuesThatWereGiven() {
-        BattleFilter filter = new AnalysisRequest(List.of("#A"), List.of(BattleType.ranked, BattleType.ranked),
+        BattleFilter filter = new AnalysisRequest(List.of("#A"), false, List.of(BattleType.ranked, BattleType.ranked),
                 null, 100000, 120000, List.of("heist"), List.of("Kaboom Canyon"), null, null, 50, null).toFilter();
 
         assertThat(filter.battleTypes()).containsExactly(BattleType.ranked);
@@ -47,7 +47,7 @@ class AnalysisRequestTest {
 
     @Test
     void convertsDatesToTheStoredFormat() {
-        BattleFilter filter = new AnalysisRequest(List.of("#A"), null, null, null, null, null, null,
+        BattleFilter filter = new AnalysisRequest(List.of("#A"), false, null, null, null, null, null, null,
                 "2026-10-01", "2026-10-02", null, null).toFilter();
 
         // "from" is the start of the day and "to" is the end of the day
@@ -57,22 +57,23 @@ class AnalysisRequestTest {
 
     @Test
     void acceptsDateAndTime() {
-        BattleFilter filter = new AnalysisRequest(List.of("#A"), null, null, null, null, null, null,
+        BattleFilter filter = new AnalysisRequest(List.of("#A"), false, null, null, null, null, null, null,
                 "2026-10-01T10:30:00", null, null, null).toFilter();
 
         assertThat(filter.fromTime()).isEqualTo("20261001T103000.000Z");
     }
 
-    @Test
-    void requiresAtLeastOnePlayer() {
-        assertThatThrownBy(() -> request(null).toFilter()).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> request(List.of()).toFilter()).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> request(List.of(" ")).toFilter()).isInstanceOf(IllegalArgumentException.class);
-    }
+//    Omitted after adding allPlayers filter
+//    @Test
+//    void requiresAtLeastOnePlayer() {
+//        assertThatThrownBy(() -> request(null).toFilter()).isInstanceOf(IllegalArgumentException.class);
+//        assertThatThrownBy(() -> request(List.of()).toFilter()).isInstanceOf(IllegalArgumentException.class);
+//        assertThatThrownBy(() -> request(List.of(" ")).toFilter()).isInstanceOf(IllegalArgumentException.class);
+//    }
 
     @Test
     void rejectsInvalidDate() {
-        AnalysisRequest request = new AnalysisRequest(List.of("#A"), null, null, null, null, null, null,
+        AnalysisRequest request = new AnalysisRequest(List.of("#A"), false,  null, null, null, null, null, null,
                 "01/10/2026", null, null, null);
 
         assertThatThrownBy(request::toFilter)
@@ -82,7 +83,7 @@ class AnalysisRequestTest {
 
     @Test
     void rejectsFromAfterTo() {
-        AnalysisRequest request = new AnalysisRequest(List.of("#A"), null, null, null, null, null, null,
+        AnalysisRequest request = new AnalysisRequest(List.of("#A"), false, null, null, null, null, null, null,
                 "2026-10-05", "2026-10-01", null, null);
 
         assertThatThrownBy(request::toFilter).isInstanceOf(IllegalArgumentException.class);
@@ -90,7 +91,7 @@ class AnalysisRequestTest {
 
     @Test
     void rejectsTrophiesMinGreaterThanMax() {
-        AnalysisRequest request = new AnalysisRequest(List.of("#A"), null, null, 120000, 100000, null, null,
+        AnalysisRequest request = new AnalysisRequest(List.of("#A"), false, null, null, 120000, 100000, null, null,
                 null, null, null, null);
 
         assertThatThrownBy(request::toFilter).isInstanceOf(IllegalArgumentException.class);
@@ -98,7 +99,7 @@ class AnalysisRequestTest {
 
     @Test
     void rejectsLimitBelowOne() {
-        AnalysisRequest request = new AnalysisRequest(List.of("#A"), null, null, null, null, null, null,
+        AnalysisRequest request = new AnalysisRequest(List.of("#A"), false, null, null, null, null, null, null,
                 null, null, 0, null);
 
         assertThatThrownBy(request::toFilter).isInstanceOf(IllegalArgumentException.class);
@@ -108,12 +109,12 @@ class AnalysisRequestTest {
     void minGamesDefaultsToOneAndRejectsLowerValues() {
         assertThat(request(List.of("#A")).minGamesOrDefault()).isEqualTo(1);
 
-        AnalysisRequest invalid = new AnalysisRequest(List.of("#A"), null, null, null, null, null, null,
+        AnalysisRequest invalid = new AnalysisRequest(List.of("#A"), false, null, null, null, null, null, null,
                 null, null, null, 0);
         assertThatThrownBy(invalid::minGamesOrDefault).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static AnalysisRequest request(List<String> players) {
-        return new AnalysisRequest(players, null, null, null, null, null, null, null, null, null, null);
+        return new AnalysisRequest(players, false, null, null, null, null, null, null, null, null, null, null);
     }
 }

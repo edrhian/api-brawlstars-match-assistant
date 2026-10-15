@@ -14,6 +14,7 @@ import java.util.List;
  */
 public record BattleFilter(
         List<String> players,
+        boolean allPlayers,
         List<BattleType> battleTypes,
         List<String> ranks,
         Integer trophiesMin,

@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class AnalysisServiceInputTest {
 
     private static final BattleFilter FILTER = new BattleFilter(
-            List.of("#A"), List.of(), List.of(), null, null, List.of(), List.of(), null, null, null);
+            List.of("#A"), false, List.of(), List.of(), null, null, List.of(), List.of(), null, null, null);
 
     @Mock
     private BattleRepository battleRepository;
