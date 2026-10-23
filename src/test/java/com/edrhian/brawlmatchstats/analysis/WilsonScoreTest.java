@@ -45,7 +45,6 @@ class WilsonScoreTest {
 
         assertThat(stats.games()).isEqualTo(10);
         assertThat(stats.winrate()).isEqualTo(80.0);
-        assertThat(stats.loserate()).isEqualTo(20.0);
         assertThat(stats.wilsonLower()).isEqualTo(49.0);
         assertThat(stats.wilsonUpper()).isEqualTo(94.3);
         assertThat(stats.confidence()).isEqualTo(Confidence.LOW);
@@ -57,7 +56,6 @@ class WilsonScoreTest {
 
         assertThat(stats.games()).isEqualTo(4);
         assertThat(stats.winrate()).isEqualTo(25.0);
-        assertThat(stats.loserate()).isEqualTo(25.0);
         assertThat(stats.draws()).isEqualTo(2);
     }
 

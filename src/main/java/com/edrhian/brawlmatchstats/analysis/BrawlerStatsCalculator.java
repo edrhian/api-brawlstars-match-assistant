@@ -2,24 +2,24 @@ package com.edrhian.brawlmatchstats.analysis;
 
 import com.edrhian.brawlmatchstats.battle.Battle;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 /**
- * Counts wins, losses and draws from a list of already filtered battles.
+ * Counts wins, losses and draws of each Brawler from a list of already filtered battles.
  *
- * The result of a battle is always from the point of view of the ally team, so:
- * - for ally Brawlers it is how well we do when we pick them
- * - for enemy Brawlers it is how well we do when we play against them
+ * Every Brawler gets the result of its own team. The battle result is stored from the point
+ * of view of the ally team, so for the enemy team it is the opposite: if the ally team loses,
+ * the 3 enemy Brawlers get a win.
  *
- * A Brawler counts once per battle, even if it appears twice in the same team.
- * Battles without a known result (victory, defeat, draw) are ignored.
- * Brawler names are compared ignoring upper and lower case.
+ * - A Brawler counts once per team and battle, even if it is repeated in the same team.
+ * - Battles without a known result (victory, defeat, draw) are ignored.
+ * - Brawler names are compared ignoring upper and lower case.
  */
 public final class BrawlerStatsCalculator {
 
@@ -27,71 +27,23 @@ public final class BrawlerStatsCalculator {
         // Only static methods, nobody needs to create this class
     }
 
-    public static StatsDto overall(List<Battle> battles) {
-        Tally tally = new Tally();
-        for (Battle battle : battles) {
-            tally.add(battle.getBattleResult());
-        }
-        return StatsDto.of(tally.wins, tally.losses, tally.draws);
-    }
-
-    // ---------- Part 1: results of each Brawler ----------
-
-    public static List<BrawlerStatsDto> allyBrawlers(List<Battle> battles, int minGames) {
-        return byBrawler(battles, minGames, BrawlerStatsCalculator::allyBrawlersOf);
-    }
-
-    public static List<BrawlerStatsDto> enemyBrawlers(List<Battle> battles, int minGames) {
-        return byBrawler(battles, minGames, BrawlerStatsCalculator::enemyBrawlersOf);
-    }
-
-    // ---------- Part 3: results depending on an input of Brawlers ----------
-
-    // The battles where ALL these Brawlers were in the ally team
-    public static List<Battle> withAllyBrawlers(List<Battle> battles, List<String> brawlers) {
-        return battles.stream().filter(battle -> containsAll(allyBrawlersOf(battle), brawlers)).toList();
-    }
-
-    // The battles where ALL these Brawlers were in the enemy team
-    public static List<Battle> withEnemyBrawlers(List<Battle> battles, List<String> brawlers) {
-        return battles.stream().filter(battle -> containsAll(enemyBrawlersOf(battle), brawlers)).toList();
-    }
-
     /**
-     * Ally synergy. Takes the battles that have all the input Brawlers in the ally team and
-     * counts each other ally Brawler separately: with input SHELLY, a battle of SHELLY + COLT + SPIKE
-     * counts for [SHELLY + COLT] and also for [SHELLY + SPIKE], and COLT + SPIKE is not a fixed pair.
+     * @param input optional brawlers: "with" must be teammates and "against" must be in the other team.
+     *              The brawlers of "with" are not listed (they would be their own partner).
+     * @return most played first, alphabetical when there is a tie
      */
-    public static List<BrawlerStatsDto> allyPartners(List<Battle> battles, List<String> inputBrawlers, int minGames) {
-        return byBrawler(withAllyBrawlers(battles, inputBrawlers), minGames,
-                battle -> allyBrawlersOf(battle).stream()
-                        .filter(brawler -> brawler != null && !containsIgnoreCase(inputBrawlers, brawler))
-                        .toList());
-    }
-
-    /**
-     * Counter analysis. Takes the battles that have all the input Brawlers in the enemy team and
-     * counts each ally Brawler separately: how well each pick does against them.
-     */
-    public static List<BrawlerStatsDto> countersAgainst(List<Battle> battles, List<String> inputEnemies, int minGames) {
-        return byBrawler(withEnemyBrawlers(battles, inputEnemies), minGames,
-                BrawlerStatsCalculator::allyBrawlersOf);
-    }
-
-    // ---------- Helpers ----------
-
-    // Most played first, and alphabetical when there is a tie
-    private static List<BrawlerStatsDto> byBrawler(List<Battle> battles, int minGames,
-                                                   Function<Battle, List<String>> brawlersOf) {
+    public static List<BrawlerStatsDto> brawlers(List<Battle> battles, BrawlerInput input, int minGames) {
         Map<String, Tally> tallies = new HashMap<>();
 
         for (Battle battle : battles) {
-            // The Set removes a Brawler that is repeated in the same team
-            for (String brawler : new LinkedHashSet<>(brawlersOf.apply(battle))) {
-                if (brawler != null) {
-                    tallies.computeIfAbsent(brawler, name -> new Tally()).add(battle.getBattleResult());
-                }
-            }
+            List<String> allyTeam = Arrays.asList(
+                    battle.getAlly1Brawler(), battle.getAlly2Brawler(), battle.getAlly3Brawler());
+            List<String> enemyTeam = Arrays.asList(
+                    battle.getEnemy1Brawler(), battle.getEnemy2Brawler(), battle.getEnemy3Brawler());
+            String allyResult = battle.getBattleResult();
+
+            countTeam(tallies, allyTeam, enemyTeam, allyResult, input);
+            countTeam(tallies, enemyTeam, allyTeam, opposite(allyResult), input);
         }
 
         return tallies.entrySet().stream()
@@ -103,19 +55,47 @@ public final class BrawlerStatsCalculator {
                 .toList();
     }
 
-    // The list can contain nulls when a slot is empty
-    private static List<String> allyBrawlersOf(Battle battle) {
-        return Arrays.asList(battle.getAlly1Brawler(), battle.getAlly2Brawler(), battle.getAlly3Brawler());
+    // Counts the result of one team for each of its Brawlers
+    private static void countTeam(Map<String, Tally> tallies, List<String> team, List<String> opponents,
+                                  String teamResult, BrawlerInput input) {
+        // "against": all these Brawlers must be in the other team
+        if (!containsAll(opponents, input.against())) {
+            return;
+        }
+
+        // The Set removes a Brawler that is repeated in the same team
+        for (String brawler : new LinkedHashSet<>(team)) {
+            if (brawler == null || containsIgnoreCase(input.with(), brawler)) {
+                continue;
+            }
+
+            // "with": all these Brawlers must be teammates (the Brawler itself is not its own teammate)
+            List<String> teammates = new ArrayList<>(team);
+            teammates.remove(brawler);
+            if (containsAll(teammates, input.with())) {
+                tallies.computeIfAbsent(brawler, name -> new Tally()).add(teamResult);
+            }
+        }
     }
 
-    private static List<String> enemyBrawlersOf(Battle battle) {
-        return Arrays.asList(battle.getEnemy1Brawler(), battle.getEnemy2Brawler(), battle.getEnemy3Brawler());
+    // The result for the other team. Unknown results stay unknown (null) and are not counted
+    private static String opposite(String result) {
+        if (result == null) {
+            return null;
+        }
+        return switch (result) {
+            case "victory" -> "defeat";
+            case "defeat" -> "victory";
+            case "draw" -> "draw";
+            default -> null;
+        };
     }
 
     private static boolean containsAll(List<String> team, List<String> wanted) {
         return wanted.stream().allMatch(name -> containsIgnoreCase(team, name));
     }
 
+    // The list can contain nulls when a slot is empty
     private static boolean containsIgnoreCase(List<String> names, String name) {
         return names.stream().anyMatch(other -> other != null && other.equalsIgnoreCase(name));
     }

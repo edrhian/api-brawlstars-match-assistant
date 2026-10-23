@@ -4,14 +4,15 @@ import com.edrhian.brawlmatchstats.shared.BattleType;
 import com.edrhian.brawlmatchstats.shared.TagUtils;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * The query parameters of the analysis endpoints, exactly as they arrive.
  * Spring fills it from the URL: ?players=2VU8PGCC&players=P0PULRC&battleTypes=soloRanked&limit=100
  *
- * Everything is optional except players. toFilter() checks the values and converts them.
+ * Players are required: either players=... or allPlayers=true. Everything else is optional.
+ * toFilter() and toInput() check the values and convert them.
  */
 public record AnalysisRequest(
         List<String> players,
@@ -25,18 +26,18 @@ public record AnalysisRequest(
         String from,
         String to,
         Integer limit,
-        Integer minGames
+        Integer minGames,
+        List<String> with,
+        List<String> against
 ) {
+
+    private static final int MAX_WITH = 2;     // a team has 3 brawlers and one of them is the one we count
+    private static final int MAX_AGAINST = 3;
 
     /**
      * @throws IllegalArgumentException if something is wrong (it becomes a 400 error)
      */
     public BattleFilter toFilter() {
-        boolean isAllPlayers = Boolean.TRUE.equals(allPlayers);
-
-        // If allPlayers is true, skip validation
-        List<String> normalizedPlayers = isAllPlayers ? List.of() : normalizeTags(players);
-
         if (limit != null && limit < 1) {
             throw new IllegalArgumentException("limit must be 1 or more");
         }
@@ -50,9 +51,10 @@ public record AnalysisRequest(
             throw new IllegalArgumentException("from cannot be after to");
         }
 
+        boolean everyone = Boolean.TRUE.equals(allPlayers);
         return new BattleFilter(
-                normalizedPlayers,
-                isAllPlayers,
+                resolvePlayers(players, everyone),
+                everyone,
                 cleanTypes(battleTypes),
                 cleanText(ranks),
                 trophiesMin,
@@ -62,6 +64,13 @@ public record AnalysisRequest(
                 fromTime,
                 toTime,
                 limit);
+    }
+
+    // The brawlers that narrow down the analysis (both are optional)
+    public BrawlerInput toInput() {
+        return new BrawlerInput(
+                cleanBrawlers(with, MAX_WITH, "with"),
+                cleanBrawlers(against, MAX_AGAINST, "against"));
     }
 
     // Minimum number of games a Brawler needs to appear in the results (default 1)
@@ -75,23 +84,30 @@ public record AnalysisRequest(
         return minGames;
     }
 
-    // Tags in the same way we store them (#2VU8PGCC), without repeated or empty ones
-    static List<String> normalizeTags(List<String> rawTags) {
+    /**
+     * Players are required: tags (stored like #2VU8PGCC) or allPlayers=true, but not both.
+     * With allPlayers the list is empty.
+     */
+    static List<String> resolvePlayers(List<String> rawTags, boolean allPlayers) {
         List<String> tags = cleanText(rawTags).stream().map(TagUtils::normalize).distinct().toList();
-        // Empty = all players
-
+        if (allPlayers && !tags.isEmpty()) {
+            throw new IllegalArgumentException("Use either players or allPlayers=true, not both");
+        }
+        if (!allPlayers && tags.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Choose players (for example players=2VU8PGCC) or use allPlayers=true");
+        }
         return tags;
     }
 
-    // Brawler names as the API writes them (uppercase), 1 to 3 different ones
-    static List<String> cleanBrawlers(List<String> rawBrawlers) {
+    // Brawler names as the API writes them (uppercase), without repeated ones
+    private static List<String> cleanBrawlers(List<String> rawBrawlers, int max, String parameter) {
         List<String> brawlers = cleanText(rawBrawlers).stream()
                 .map(name -> name.toUpperCase(Locale.ROOT))
                 .distinct()
                 .toList();
-        if (brawlers.isEmpty() || brawlers.size() > 3) {
-            throw new IllegalArgumentException(
-                    "Choose between 1 and 3 different brawlers, for example brawlers=SHELLY");
+        if (brawlers.size() > max) {
+            throw new IllegalArgumentException(parameter + " accepts up to " + max + " different brawlers");
         }
         return brawlers;
     }

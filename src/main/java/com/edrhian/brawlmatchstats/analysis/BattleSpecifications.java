@@ -22,12 +22,16 @@ public final class BattleSpecifications {
         return (root, query, cb) -> {
             List<Predicate> conditions = new ArrayList<>();
 
-            // 1. Players: a battle counts if the player is Ally 1, 2 or 3 (never as enemy)
+            // 1. Players: a battle counts if a player is in any of the 6 slots.
+            //    With allPlayers there is no condition (and the query is faster)
             if (!filter.allPlayers()) {
                 conditions.add(cb.or(
                         root.get("ally1").in(filter.players()),
                         root.get("ally2").in(filter.players()),
-                        root.get("ally3").in(filter.players())));
+                        root.get("ally3").in(filter.players()),
+                        root.get("enemy1").in(filter.players()),
+                        root.get("enemy2").in(filter.players()),
+                        root.get("enemy3").in(filter.players())));
             }
 
             // 2. Battle type

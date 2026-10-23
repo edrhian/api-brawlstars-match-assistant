@@ -26,7 +26,6 @@ class AnalysisQueriesTest {
     private static final String T2 = "20261001T110000.000Z";
     private static final String T3 = "20261001T120000.000Z";
     private static final String T4 = "20261001T130000.000Z";
-    private static final String T5 = "20261001T140000.000Z";
 
     @Autowired
     private BattleRepository battleRepository;
@@ -42,10 +41,10 @@ class AnalysisQueriesTest {
         registerPlayers("#A", "#B", "#C");
     }
 
-    // ---------- Filters ----------
+    // ---------- Players ----------
 
     @Test
-    void matchesPlayerInAnyAllySlotButNotAsEnemy() {
+    void matchesPlayerInAnyOfTheSixSlots() {
         Battle asAlly1 = battle(T1, "#A");
         Battle asAlly2 = battle(T2, "#B");
         asAlly2.setAlly2("#A");
@@ -53,12 +52,54 @@ class AnalysisQueriesTest {
         asAlly3.setAlly3("#A");
         Battle asEnemy = battle(T4, "#C");
         asEnemy.setEnemy1("#A");
-        battleRepository.saveAll(List.of(asAlly1, asAlly2, asAlly3, asEnemy));
+        Battle withoutA = battle("20261001T140000.000Z", "#C");
+        battleRepository.saveAll(List.of(asAlly1, asAlly2, asAlly3, asEnemy, withoutA));
 
         List<Battle> result = service.findBattles(Filter.forPlayers("#A").build());
 
+        assertThat(result).extracting(Battle::getBattleTime).containsExactlyInAnyOrder(T1, T2, T3, T4);
+    }
+
+    @Test
+    void battleWithTwoSelectedPlayersIsCountedOnce() {
+        // #A and #B are in the same battle, one in each team
+        Battle shared = battle(T1, "#A");
+        shared.setEnemy2("#B");
+        battleRepository.save(shared);
+
+        List<Battle> result = service.findBattles(Filter.forPlayers("#A", "#B").build());
+
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void allPlayersReturnsEveryBattle() {
+        battleRepository.saveAll(List.of(battle(T1, "#A"), battle(T2, "#B"), battle(T3, "#C")));
+
+        List<Battle> result = service.findBattles(Filter.everyone().build());
+
         assertThat(result).extracting(Battle::getBattleTime).containsExactlyInAnyOrder(T1, T2, T3);
     }
+
+    @Test
+    void allPlayersStillAppliesTheOtherFilters() {
+        Battle ranked = battle(T2, "#B");
+        ranked.setBattleType(BattleType.ranked);
+        battleRepository.saveAll(List.of(battle(T1, "#A"), ranked));
+
+        List<Battle> result = service.findBattles(Filter.everyone().types(BattleType.ranked).build());
+
+        assertThat(result).extracting(Battle::getBattleTime).containsExactly(T2);
+    }
+
+    @Test
+    void throwsWhenAPlayerIsNotRegistered() {
+        assertThatThrownBy(() -> service.findBattles(Filter.forPlayers("#A", "#UNKNOWN").build()))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("#UNKNOWN");
+    }
+
+    // ---------- Filters ----------
 
     @Test
     void filtersByBattleType() {
@@ -152,25 +193,6 @@ class AnalysisQueriesTest {
         assertThat(result).extracting(Battle::getBattleTime).containsExactly(T3, T2);
     }
 
-    @Test
-    void sharedMatchOfTwoSelectedPlayersIsCountedOnce() {
-        // The match is stored once, under #A, and #B is Ally 2
-        Battle shared = battle(T1, "#A");
-        shared.setAlly2("#B");
-        battleRepository.save(shared);
-
-        List<Battle> result = service.findBattles(Filter.forPlayers("#A", "#B").build());
-
-        assertThat(result).hasSize(1);
-    }
-
-    @Test
-    void throwsWhenAPlayerIsNotRegistered() {
-        assertThatThrownBy(() -> service.findBattles(Filter.forPlayers("#A", "#UNKNOWN").build()))
-                .isInstanceOf(NoSuchElementException.class)
-                .hasMessageContaining("#UNKNOWN");
-    }
-
     // ---------- Filter options ----------
 
     @Test
@@ -187,7 +209,7 @@ class AnalysisQueriesTest {
         other.setMap("Other Map");
         battleRepository.saveAll(List.of(first, second, other));
 
-        FilterOptionsResponse options = service.getFilterOptions(List.of("a"), false);
+        FilterOptionsResponse options = service.getFilterOptions(List.of("#A"), false);
 
         assertThat(options.battleTypes()).containsExactly(BattleType.ranked, BattleType.soloRanked);
         assertThat(options.ranks()).containsExactly("LEGENDARY I", "MASTERS I");
@@ -197,6 +219,18 @@ class AnalysisQueriesTest {
         assertThat(options.trophiesMax()).isEqualTo(120000);
         assertThat(options.firstBattle()).isEqualTo("2026-10-01T10:00:00");
         assertThat(options.lastBattle()).isEqualTo("2026-10-01T12:00:00");
+    }
+
+    @Test
+    void filterOptionsOfAllPlayersIncludeEveryBattle() {
+        Battle first = battle(T1, "#A");
+        Battle other = battle(T2, "#C");
+        other.setMap("Other Map");
+        battleRepository.saveAll(List.of(first, other));
+
+        FilterOptionsResponse options = service.getFilterOptions(List.of(), true);
+
+        assertThat(options.maps()).containsExactly("Kaboom Canyon", "Other Map");
     }
 
     @Test
@@ -211,6 +245,16 @@ class AnalysisQueriesTest {
         assertThat(options.trophiesMax()).isNull();
         assertThat(options.firstBattle()).isNull();
         assertThat(options.lastBattle()).isNull();
+    }
+
+    @Test
+    void filterOptionsAreEmptyWhenThereAreNoPlayersAtAll() {
+        playerRepository.deleteAll();
+
+        FilterOptionsResponse options = service.getFilterOptions(List.of(), true);
+
+        assertThat(options.battleTypes()).isEmpty();
+        assertThat(options.firstBattle()).isNull();
     }
 
     // ---------- Helpers ----------
@@ -241,6 +285,7 @@ class AnalysisQueriesTest {
 
     // Small builder, so each test only writes the filters it needs
     private static class Filter {
+        private final boolean allPlayers;
         private final List<String> players;
         private List<BattleType> types = List.of();
         private List<String> ranks = List.of();
@@ -252,12 +297,17 @@ class AnalysisQueriesTest {
         private String to;
         private Integer limit;
 
-        private Filter(String... players) {
-            this.players = List.of(players);
+        private Filter(boolean allPlayers, List<String> players) {
+            this.allPlayers = allPlayers;
+            this.players = players;
         }
 
         static Filter forPlayers(String... players) {
-            return new Filter(players);
+            return new Filter(false, List.of(players));
+        }
+
+        static Filter everyone() {
+            return new Filter(true, List.of());
         }
 
         Filter types(BattleType... values) {
@@ -298,7 +348,8 @@ class AnalysisQueriesTest {
         }
 
         BattleFilter build() {
-            return new BattleFilter(players,false ,types, ranks, trophiesMin, trophiesMax, modes, maps, from, to, limit);
+            return new BattleFilter(players, allPlayers, types, ranks, trophiesMin, trophiesMax,
+                    modes, maps, from, to, limit);
         }
     }
 }

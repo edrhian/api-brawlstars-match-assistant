@@ -10,7 +10,6 @@ public record BrawlerStatsDto(
         int losses,
         int draws,
         double winrate,
-        double loserate,
         double wilsonLower,
         double wilsonUpper,
         Confidence confidence
@@ -19,6 +18,6 @@ public record BrawlerStatsDto(
     public static BrawlerStatsDto of(String brawler, int wins, int losses, int draws) {
         StatsDto stats = StatsDto.of(wins, losses, draws);
         return new BrawlerStatsDto(brawler, stats.games(), stats.wins(), stats.losses(), stats.draws(),
-                stats.winrate(), stats.loserate(), stats.wilsonLower(), stats.wilsonUpper(), stats.confidence());
+                stats.winrate(), stats.wilsonLower(), stats.wilsonUpper(), stats.confidence());
     }
 }

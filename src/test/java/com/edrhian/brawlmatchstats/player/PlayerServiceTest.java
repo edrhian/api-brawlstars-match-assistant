@@ -70,7 +70,7 @@ class PlayerServiceTest {
 
         assertThat(dto.trackingEnabled()).isTrue();
         assertThat(dto.trackingTypes())
-                .containsExactly(BattleType.ranked, BattleType.soloRanked, BattleType.friendly);
+                .containsExactly(BattleType.ranked, BattleType.soloRanked, BattleType.friendly, BattleType.tournament);
     }
 
     @Test

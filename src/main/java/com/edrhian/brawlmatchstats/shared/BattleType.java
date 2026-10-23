@@ -8,11 +8,13 @@ package com.edrhian.brawlmatchstats.shared;
  * - ranked:     trophy games (BrawlStars calls them "ranked" for some reason)
  * - soloRanked: the competitive mode with ranks, even if it was played in a premade party
  * - friendly:   custom friendly battles, included because they are used in scrims
+ * - tournament: custom tournament battles (BSCS)
  *
  * Any other type sent by the API (trophyRoad, challenge...) is not stored.
  */
 public enum BattleType {
     ranked,
     soloRanked,
-    friendly
+    friendly,
+    tournament
 }

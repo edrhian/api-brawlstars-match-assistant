@@ -17,9 +17,7 @@ import java.util.NoSuchElementException;
 /**
  * Battle analysis. Two steps:
  * 1. findBattles: the database applies all the filters (the "filtered battles").
- * 2. a calculator counts the results of those battles.
- *
- * Every analysis reuses step 1 and only changes the calculator.
+ * 2. the calculator counts the results of those battles.
  */
 @Service
 public class AnalysisService {
@@ -33,66 +31,31 @@ public class AnalysisService {
     }
 
     /**
-     * Pick comfort: results of the ally team for each Brawler picked in the ally team.
+     * Winrate of each Brawler, seen from its own team (an enemy win is a win for the enemy Brawlers).
+     * "with" and "against" are applied after the limit, to the filtered battles.
      */
-    public BrawlerAnalysisResponse analyzeAllyBrawlers(BattleFilter filter, int minGames) {
+    public BrawlerAnalysisResponse analyzeBrawlers(BattleFilter filter, BrawlerInput input, int minGames) {
         List<Battle> battles = findBattles(filter);
         return new BrawlerAnalysisResponse(
-                BrawlerStatsCalculator.overall(battles),
-                BrawlerStatsCalculator.allyBrawlers(battles, minGames));
-    }
-
-    /**
-     * Confrontation comfort: results of the ally team for each Brawler seen in the enemy team.
-     * winrate is how often we win against it, loserate how often we lose.
-     */
-    public BrawlerAnalysisResponse analyzeEnemyBrawlers(BattleFilter filter, int minGames) {
-        List<Battle> battles = findBattles(filter);
-        return new BrawlerAnalysisResponse(
-                BrawlerStatsCalculator.overall(battles),
-                BrawlerStatsCalculator.enemyBrawlers(battles, minGames));
-    }
-
-    /**
-     * Ally synergy: results of each partner Brawler in the battles where all the input Brawlers
-     * were in the ally team. "withInput" is the result of those battles without looking at partners.
-     */
-    public InputAnalysisResponse analyzeAllySynergy(BattleFilter filter, List<String> brawlers, int minGames) {
-        List<Battle> battles = findBattles(filter);
-        return new InputAnalysisResponse(
-                brawlers,
-                BrawlerStatsCalculator.overall(battles),
-                BrawlerStatsCalculator.overall(BrawlerStatsCalculator.withAllyBrawlers(battles, brawlers)),
-                BrawlerStatsCalculator.allyPartners(battles, brawlers, minGames));
-    }
-
-    /**
-     * Counter analysis: results of each ally pick in the battles where all the input Brawlers
-     * were in the enemy team. "withInput" is the result of those battles without looking at picks.
-     */
-    public InputAnalysisResponse analyzeEnemyCounters(BattleFilter filter, List<String> brawlers, int minGames) {
-        List<Battle> battles = findBattles(filter);
-        return new InputAnalysisResponse(
-                brawlers,
-                BrawlerStatsCalculator.overall(battles),
-                BrawlerStatsCalculator.overall(BrawlerStatsCalculator.withEnemyBrawlers(battles, brawlers)),
-                BrawlerStatsCalculator.countersAgainst(battles, brawlers, minGames));
+                battles.size(),
+                BrawlerStatsCalculator.brawlers(battles, input, minGames));
     }
 
     /**
      * Existing values of the database for some players (all their battles, without other filters).
+     *
+     * @param players already normalized tags (ignored when allPlayers is true)
      */
     public FilterOptionsResponse getFilterOptions(List<String> players, boolean allPlayers) {
         List<String> tags;
         if (allPlayers) {
-            // Fetch all registered player tags from the database
             tags = playerRepository.findAll().stream().map(Player::getTag).toList();
             if (tags.isEmpty()) {
-                throw new NoSuchElementException("No players registered in the database");
+                return new FilterOptionsResponse(List.of(), List.of(), List.of(), List.of(), null, null, null, null);
             }
         } else {
-            tags = AnalysisRequest.normalizeTags(players);
-            requireRegistered(tags);
+            requireRegistered(players);
+            tags = players;
         }
 
         BattleRange range = battleRepository.findRangeByPlayers(tags);
@@ -112,7 +75,6 @@ public class AnalysisService {
      * battles are taken from the battles that already passed the other filters.
      */
     public List<Battle> findBattles(BattleFilter filter) {
-        // Only validate specific players if we are not querying all players
         if (!filter.allPlayers()) {
             requireRegistered(filter.players());
         }
@@ -128,10 +90,6 @@ public class AnalysisService {
     }
 
     private void requireRegistered(List<String> tags) {
-        // If tags are null or empty, we skip validation
-        if (tags == null || tags.isEmpty()) {
-            return;
-        }
         List<String> registered = playerRepository.findAllById(tags).stream().map(Player::getTag).toList();
         List<String> missing = tags.stream().filter(tag -> !registered.contains(tag)).toList();
         if (!missing.isEmpty()) {

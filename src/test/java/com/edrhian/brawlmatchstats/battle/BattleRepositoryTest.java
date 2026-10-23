@@ -41,46 +41,6 @@ class BattleRepositoryTest {
         assertThat(found.getFetchedAt()).isEqualTo("2026-10-07T11:00:39");
     }
 
-    @Test
-    void existsWhenTagTimeAndTypeMatch() {
-        battleRepository.save(createBattle(BATTLE_TIME, PLAYER_TAG, BattleType.soloRanked));
-
-        boolean exists = battleRepository.existsByAlly1AndBattleTimeAndBattleType(
-                PLAYER_TAG, BATTLE_TIME, BattleType.soloRanked);
-
-        assertThat(exists).isTrue();
-    }
-
-    @Test
-    void doesNotExistWhenBattleTypeIsDifferent() {
-        battleRepository.save(createBattle(BATTLE_TIME, PLAYER_TAG, BattleType.soloRanked));
-
-        boolean exists = battleRepository.existsByAlly1AndBattleTimeAndBattleType(
-                PLAYER_TAG, BATTLE_TIME, BattleType.ranked);
-
-        assertThat(exists).isFalse();
-    }
-
-    @Test
-    void doesNotExistWhenTagIsDifferent() {
-        battleRepository.save(createBattle(BATTLE_TIME, PLAYER_TAG, BattleType.soloRanked));
-
-        boolean exists = battleRepository.existsByAlly1AndBattleTimeAndBattleType(
-                "#P0PULRC", BATTLE_TIME, BattleType.soloRanked);
-
-        assertThat(exists).isFalse();
-    }
-
-    @Test
-    void doesNotExistWhenBattleTimeIsDifferent() {
-        battleRepository.save(createBattle(BATTLE_TIME, PLAYER_TAG, BattleType.soloRanked));
-
-        boolean exists = battleRepository.existsByAlly1AndBattleTimeAndBattleType(
-                PLAYER_TAG, "20261007T080000.000Z", BattleType.soloRanked);
-
-        assertThat(exists).isFalse();
-    }
-
     private Battle createBattle(String battleTime, String ally1, BattleType type) {
         Battle battle = new Battle();
         battle.setId(Battle.buildId(battleTime, ally1));

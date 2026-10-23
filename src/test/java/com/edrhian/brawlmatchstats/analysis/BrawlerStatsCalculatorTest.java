@@ -9,109 +9,175 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class BrawlerStatsCalculatorTest {
 
+    // The same two battles for most tests:
+    // 1. SHELLY COLT SPIKE beat BROCK CARL BYRON
+    // 2. COLT AMBER SPIKE lose against CARL DARRYL BYRON
+    private final List<Battle> battles = List.of(
+            battle("victory", "SHELLY", "COLT", "SPIKE", "BROCK", "CARL", "BYRON"),
+            battle("defeat", "COLT", "AMBER", "SPIKE", "CARL", "DARRYL", "BYRON"));
+
+    // ---------- Winrate of every brawler ----------
+
     @Test
-    void countsEachAllyBrawlerOncePerBattle() {
-        List<Battle> battles = List.of(
-                battle("victory", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"),
-                // COLT is twice in this team, but it counts once
-                battle("defeat", "COLT", "COLT", "AMBER", "BROCK", "CARL", "BYRON"));
+    void everyBrawlerGetsTheResultOfItsOwnTeam() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(battles, BrawlerInput.NONE, 1);
 
-        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.allyBrawlers(battles, 1);
-
-        // Most played first, then alphabetical
-        assertThat(stats).extracting(BrawlerStatsDto::brawler)
-                .containsExactly("COLT", "AMBER", "SHELLY", "SPIKE");
-        BrawlerStatsDto colt = stats.get(0);
-        assertThat(colt.games()).isEqualTo(2);
-        assertThat(colt.wins()).isEqualTo(1);
-        assertThat(colt.losses()).isEqualTo(1);
-        assertThat(colt.winrate()).isEqualTo(50.0);
+        // The ally team lost battle 2, so DARRYL (enemy) won it
+        assertThat(find(stats, "DARRYL").wins()).isEqualTo(1);
+        assertThat(find(stats, "DARRYL").winrate()).isEqualTo(100.0);
+        // The ally team won battle 1, so BROCK (enemy) lost it
+        assertThat(find(stats, "BROCK").losses()).isEqualTo(1);
+        assertThat(find(stats, "BROCK").winrate()).isZero();
+        // BYRON was an enemy in both: lost battle 1 and won battle 2
+        assertThat(find(stats, "BYRON").games()).isEqualTo(2);
+        assertThat(find(stats, "BYRON").winrate()).isEqualTo(50.0);
     }
 
     @Test
-    void countsDrawsAsGamesButNotWins() {
-        List<Battle> battles = List.of(battle("draw", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"));
+    void sortsByGamesAndThenByName() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(battles, BrawlerInput.NONE, 1);
 
-        BrawlerStatsDto colt = BrawlerStatsCalculator.allyBrawlers(battles, 1).get(0);
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly(
+                "BYRON", "CARL", "COLT", "SPIKE", "AMBER", "BROCK", "DARRYL", "SHELLY");
+    }
 
-        assertThat(colt.games()).isEqualTo(1);
-        assertThat(colt.draws()).isEqualTo(1);
-        assertThat(colt.winrate()).isZero();
-        assertThat(colt.loserate()).isZero();
+    @Test
+    void minGamesHidesBrawlersWithFewerGames() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(battles, BrawlerInput.NONE, 2);
+
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("BYRON", "CARL", "COLT", "SPIKE");
+    }
+
+    @Test
+    void sameBrawlerOnBothSidesIsOneRow() {
+        List<Battle> list = List.of(
+                // COLT is an ally and wins
+                battle("victory", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"),
+                // COLT is an enemy and the ally team loses, so COLT wins again
+                battle("defeat", "AMBER", "DARRYL", "PIPER", "COLT", "MORTIS", "POCO"));
+
+        BrawlerStatsDto colt = find(BrawlerStatsCalculator.brawlers(list, BrawlerInput.NONE, 1), "COLT");
+
+        assertThat(colt.games()).isEqualTo(2);
+        assertThat(colt.wins()).isEqualTo(2);
+        assertThat(colt.winrate()).isEqualTo(100.0);
+    }
+
+    @Test
+    void drawsAreGamesButNotWinsForBothTeams() {
+        List<Battle> list = List.of(battle("draw", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"));
+
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(list, BrawlerInput.NONE, 1);
+
+        assertThat(stats).hasSize(6);
+        assertThat(stats).allSatisfy(stat -> {
+            assertThat(stat.games()).isEqualTo(1);
+            assertThat(stat.draws()).isEqualTo(1);
+            assertThat(stat.wins()).isZero();
+            assertThat(stat.winrate()).isZero();
+        });
     }
 
     @Test
     void ignoresBattlesWithoutKnownResult() {
-        List<Battle> battles = List.of(
+        List<Battle> list = List.of(
                 battle(null, "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"),
-                battle("something", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"));
+                battle("weird", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"));
 
-        assertThat(BrawlerStatsCalculator.allyBrawlers(battles, 1)).isEmpty();
-        assertThat(BrawlerStatsCalculator.overall(battles).games()).isZero();
+        assertThat(BrawlerStatsCalculator.brawlers(list, BrawlerInput.NONE, 1)).isEmpty();
     }
 
     @Test
-    void ignoresMissingBrawlers() {
-        List<Battle> battles = List.of(battle("victory", "COLT", null, null, "BROCK", null, null));
+    void countsABrawlerOncePerTeamAndBattle() {
+        List<Battle> list = List.of(battle("victory", "COLT", "COLT", "AMBER", "BROCK", "CARL", "BYRON"));
 
-        assertThat(BrawlerStatsCalculator.allyBrawlers(battles, 1)).extracting(BrawlerStatsDto::brawler)
-                .containsExactly("COLT");
-        assertThat(BrawlerStatsCalculator.enemyBrawlers(battles, 1)).extracting(BrawlerStatsDto::brawler)
-                .containsExactly("BROCK");
+        BrawlerStatsDto colt = find(BrawlerStatsCalculator.brawlers(list, BrawlerInput.NONE, 1), "COLT");
+
+        assertThat(colt.games()).isEqualTo(1);
     }
 
     @Test
-    void hidesBrawlersBelowMinGames() {
-        List<Battle> battles = List.of(
-                battle("victory", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"),
-                battle("defeat", "COLT", "AMBER", "SPIKE", "BROCK", "CARL", "BYRON"));
+    void emptySlotsAreIgnored() {
+        List<Battle> list = List.of(battle("victory", "COLT", null, null, "BROCK", null, null));
 
-        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.allyBrawlers(battles, 2);
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(list, BrawlerInput.NONE, 1);
+
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("BROCK", "COLT");
+    }
+
+    // ---------- with: brawlers that must be teammates ----------
+
+    @Test
+    void withListsTheTeammatesOfTheInputBrawler() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(
+                battles, new BrawlerInput(List.of("SHELLY"), List.of()), 1);
+
+        // Only battle 1 has SHELLY, and SHELLY itself is not listed
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("COLT", "SPIKE");
+        assertThat(stats).allSatisfy(stat -> assertThat(stat.winrate()).isEqualTo(100.0));
+    }
+
+    @Test
+    void withTwoBrawlersNeedsBothAsTeammates() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(
+                battles, new BrawlerInput(List.of("SHELLY", "COLT"), List.of()), 1);
+
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("SPIKE");
+    }
+
+    @Test
+    void inputNamesAreComparedIgnoringCase() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(
+                battles, new BrawlerInput(List.of("shelly"), List.of()), 1);
 
         assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("COLT", "SPIKE");
     }
 
+    // ---------- against: brawlers that must be in the other team ----------
+
     @Test
-    void enemyStatsUseTheResultOfTheAllyTeam() {
-        List<Battle> battles = List.of(
-                battle("victory", "COLT", "SHELLY", "SPIKE", "BROCK", "CARL", "BYRON"),
-                battle("defeat", "COLT", "SHELLY", "SPIKE", "BROCK", "DARRYL", "AMBER"));
+    void againstListsTheBrawlersThatPlayedAgainstTheInputBrawler() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(
+                battles, new BrawlerInput(List.of(), List.of("BROCK")), 1);
 
-        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.enemyBrawlers(battles, 1);
-
-        BrawlerStatsDto brock = stats.get(0);
-        assertThat(brock.brawler()).isEqualTo("BROCK");
-        assertThat(brock.games()).isEqualTo(2);
-        assertThat(brock.winrate()).isEqualTo(50.0);
-        assertThat(brock.loserate()).isEqualTo(50.0);
+        // BROCK was only in battle 1, in the enemy team. The ally team won
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("COLT", "SHELLY", "SPIKE");
+        assertThat(stats).allSatisfy(stat -> assertThat(stat.wins()).isEqualTo(1));
     }
 
     @Test
-    void overallCountsAllBattlesWithAResult() {
-        List<Battle> battles = List.of(
-                battle("victory", "COLT", null, null, null, null, null),
-                battle("defeat", "COLT", null, null, null, null, null),
-                battle("draw", "COLT", null, null, null, null, null),
-                battle(null, "COLT", null, null, null, null, null));
+    void againstWorksWhenTheInputBrawlerIsInTheAllyTeam() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(
+                battles, new BrawlerInput(List.of(), List.of("SHELLY")), 1);
 
-        StatsDto overall = BrawlerStatsCalculator.overall(battles);
-
-        assertThat(overall.games()).isEqualTo(3);
-        assertThat(overall.wins()).isEqualTo(1);
-        assertThat(overall.losses()).isEqualTo(1);
-        assertThat(overall.draws()).isEqualTo(1);
+        // SHELLY was an ally in battle 1: the enemies BROCK, CARL and BYRON lost against it
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("BROCK", "BYRON", "CARL");
+        assertThat(stats).allSatisfy(stat -> assertThat(stat.winrate()).isZero());
     }
 
-    private static Battle battle(String result, String ally1, String ally2, String ally3,
-                                 String enemy1, String enemy2, String enemy3) {
+    @Test
+    void withAndAgainstCanBeCombined() {
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(
+                battles, new BrawlerInput(List.of("SHELLY"), List.of("BROCK")), 1);
+
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("COLT", "SPIKE");
+    }
+
+    // ---------- Helpers ----------
+
+    private static BrawlerStatsDto find(List<BrawlerStatsDto> stats, String brawler) {
+        return stats.stream().filter(stat -> stat.brawler().equals(brawler)).findFirst().orElseThrow();
+    }
+
+    private static Battle battle(String result, String a1, String a2, String a3, String e1, String e2, String e3) {
         Battle battle = new Battle();
         battle.setBattleResult(result);
-        battle.setAlly1Brawler(ally1);
-        battle.setAlly2Brawler(ally2);
-        battle.setAlly3Brawler(ally3);
-        battle.setEnemy1Brawler(enemy1);
-        battle.setEnemy2Brawler(enemy2);
-        battle.setEnemy3Brawler(enemy3);
+        battle.setAlly1Brawler(a1);
+        battle.setAlly2Brawler(a2);
+        battle.setAlly3Brawler(a3);
+        battle.setEnemy1Brawler(e1);
+        battle.setEnemy2Brawler(e2);
+        battle.setEnemy3Brawler(e3);
         return battle;
     }
 }
