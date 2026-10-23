@@ -60,7 +60,7 @@ public class BattleService {
             }
         }
 
-        log.info("Player {}: {} new battles stored", cleanTag, saved);
+        log.info("Player {} ({}): {} new battles stored", cleanTag, player.getName(), saved);
         return saved;
     }
 
