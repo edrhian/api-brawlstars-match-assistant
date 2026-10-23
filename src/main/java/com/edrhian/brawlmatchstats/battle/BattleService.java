@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Reads the battle log of a tracked player and stores the battles that we do not have yet.
@@ -61,30 +60,35 @@ public class BattleService {
             }
         }
 
-        log.info("Player {} ({}): {} new battles stored", cleanTag, player.getName(), saved);
+        log.info("Player {}: {} new battles stored", cleanTag, saved);
         return saved;
     }
 
     private boolean saveIfNeeded(Player player, BrawlStarsBattleLogResponse.Item item) {
         // 1. Battle type filter: unknown types and types the player does not track are skipped
         BattleType type = parseBattleType(item);
-        if (type == null || !player.getTrackingTypes().contains(type)) {
+        if (type == null) {
+            log.debug("Skipped {} of {}: battle type '{}' is not supported",
+                    item.battleTime(), player.getTag(), item.battle() == null ? null : item.battle().type());
+            return false;
+        }
+        if (!player.getTrackingTypes().contains(type)) {
+            log.debug("Skipped {} of {}: the player does not track {}", item.battleTime(), player.getTag(), type);
             return false;
         }
 
-        // 2. Build the battle from the point of view of the tracked player (null if it has no teams)
+        // 2. Build the battle (null if it has no two teams or the tracked player is not in them)
         Battle battle = buildBattle(player, item, type);
         if (battle == null) {
+            log.debug("Skipped {} of {}: there are no two teams, or the player is not in them",
+                    item.battleTime(), player.getTag());
             return false;
         }
 
-        // 3. We already stored this battle in a previous run
+        // 3. Duplicate check: the ID is the same whichever of the 6 players reads the battle,
+        //    so if any player already stored it (ally or enemy), the ID exists
         if (battleRepository.existsById(battle.getId())) {
-            return false;
-        }
-
-        // 4. Another tracked player of the same team already stored this match
-        if (isStoredByTeammate(battle)) {
+            log.debug("Skipped {}: already stored", battle.getId());
             return false;
         }
 
@@ -133,7 +137,6 @@ public class BattleService {
         List<Participant> mates = allyTeam.stream().filter(p -> !tag.equals(p.tag())).toList();
 
         Battle battle = new Battle();
-        battle.setId(Battle.buildId(item.battleTime(), tag));
         battle.setBattleTime(item.battleTime());
         battle.setBattleType(type);
         battle.setRank(player.getRankedRank());
@@ -142,7 +145,7 @@ public class BattleService {
                 ? item.event().mode() : item.battle().mode());
         battle.setMap(item.event() != null ? item.event().map() : null);
 
-        // Ally 1 is always the tracked player, the other two are the rest of the team
+        // Ally 1 is the player whose log we read, the other two are the rest of the team
         battle.setAlly1(tag);
         battle.setAlly1Brawler(brawlerOf(me));
         battle.setAlly2(tagOf(at(mates, 0)));
@@ -157,34 +160,14 @@ public class BattleService {
         battle.setEnemy3(tagOf(at(enemyTeam, 2)));
         battle.setEnemy3Brawler(brawlerOf(at(enemyTeam, 2)));
 
+        // The ID uses the 6 tags, so it must be built after all the slots are filled
+        battle.setId(Battle.buildId(item.battleTime(),
+                battle.getAlly1(), battle.getAlly2(), battle.getAlly3(),
+                battle.getEnemy1(), battle.getEnemy2(), battle.getEnemy3()));
+
         battle.setBattleResult(item.battle().result());
         battle.setFetchedAt(TimeUtils.nowAsString());
         return battle;
-    }
-
-    /**
-     * Duplicate check: if Ally 2 or Ally 3 is a registered player with tracking enabled that also
-     * tracks this battle type, their own battle log has (or will have) this same match. If it is
-     * already stored under their tag, we skip ours.
-     */
-    private boolean isStoredByTeammate(Battle battle) {
-        return isStoredBy(battle.getAlly2(), battle) || isStoredBy(battle.getAlly3(), battle);
-    }
-
-    private boolean isStoredBy(String allyTag, Battle battle) {
-        if (allyTag == null) {
-            return false;
-        }
-
-        Optional<Player> ally = playerRepository.findById(allyTag);
-        if (ally.isEmpty()
-                || !ally.get().isTrackingEnabled()
-                || !ally.get().getTrackingTypes().contains(battle.getBattleType())) {
-            return false;
-        }
-
-        return battleRepository.existsByAlly1AndBattleTimeAndBattleType(
-                allyTag, battle.getBattleTime(), battle.getBattleType());
     }
 
     // Removes null team or null players, so the rest of the code does not need null checks

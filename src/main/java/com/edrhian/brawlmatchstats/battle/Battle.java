@@ -16,12 +16,16 @@ import jakarta.persistence.Index;
 @Table(name = "battles", indexes = {
         @Index(name = "idx_battles_ally1_time", columnList = "ally1, battleTime"),
         @Index(name = "idx_battles_ally2_time", columnList = "ally2, battleTime"),
-        @Index(name = "idx_battles_ally3_time", columnList = "ally3, battleTime")
+        @Index(name = "idx_battles_ally3_time", columnList = "ally3, battleTime"),
+        @Index(name = "idx_battles_enemy1_time", columnList = "enemy1, battleTime"),
+        @Index(name = "idx_battles_enemy2_time", columnList = "enemy2, battleTime"),
+        @Index(name = "idx_battles_enemy3_time", columnList = "enemy3, battleTime")
 })
 public class Battle {
 
-    // BrawlStars battles have no ID, so we build one: battleTime + "_" + ally1
-    // Example: 20261007T070930.000Z_#2VU8PGCC
+    // BrawlStars battles have no ID, so we build one: battleTime + "_" + the smallest tag of the 6 players
+    // Example: 20261007T070930.000Z_#2R0P8LPR9
+    // The same battle read from any of its players gets the same ID.
     @Id
     private String id;
 
@@ -73,11 +77,18 @@ public class Battle {
     }
 
     /**
-     * Builds the battle ID from the battle time and the tag of Ally 1.
-     * One player cannot play two battles at the same time, so this is unique.
+     * Builds the battle ID from the battle time and the tags of the players in the battle.
+     * It uses the alphabetically smallest tag, so every player that sees this battle builds the same ID.
+     * One player cannot finish two battles at the same second, so it is unique.
      */
-    public static String buildId(String battleTime, String ally1) {
-        return battleTime + "_" + ally1;
+    public static String buildId(String battleTime, String... tags) {
+        String smallest = null;
+        for (String tag : tags) {
+            if (tag != null && (smallest == null || tag.compareTo(smallest) < 0)) {
+                smallest = tag;
+            }
+        }
+        return battleTime + "_" + smallest;
     }
 
     public String getId() {
