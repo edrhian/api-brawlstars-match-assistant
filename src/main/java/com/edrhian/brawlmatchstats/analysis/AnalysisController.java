@@ -22,11 +22,12 @@ public class AnalysisController {
     /**
      * Winrate of every Brawler, on any team.
      * with=SHELLY: only when Shelly is a teammate. against=BROCK: only when Brock is in the other team.
+     * sort=confidence&sort=winrate:asc: order of the results (the first one has the priority).
      */
     @GetMapping("/brawlers")
     public BrawlerAnalysisResponse brawlers(AnalysisRequest request) {
         return analysisService.analyzeBrawlers(
-                request.toFilter(), request.toInput(), request.minGamesOrDefault());
+                request.toFilter(), request.toInput(), request.minGamesOrDefault(), request.toSort());
     }
 
     // Values that exist in the database, to fill the filter selectors

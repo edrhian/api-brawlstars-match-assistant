@@ -32,8 +32,9 @@ class AnalysisControllerTest {
 
     @Test
     void brawlersReadsAllTheQueryParameters() throws Exception {
-        when(analysisService.analyzeBrawlers(any(), any(), anyInt())).thenReturn(new BrawlerAnalysisResponse(
-                10, List.of(BrawlerStatsDto.of("COLT", 4, 1, 0))));
+        when(analysisService.analyzeBrawlers(any(), any(), anyInt(), any())).thenReturn(new BrawlerAnalysisResponse(
+                10, List.of("winrate:asc", "games:desc", "brawler:asc"),
+                List.of(BrawlerStatsDto.of("COLT", 4, 1, 0))));
 
         mockMvc.perform(get("/analysis/brawlers")
                         .param("players", "2VU8PGCC", "p0pulrc")
@@ -43,9 +44,12 @@ class AnalysisControllerTest {
                         .param("limit", "50")
                         .param("minGames", "5")
                         .param("with", "shelly")
-                        .param("against", "BROCK", "CARL"))
+                        .param("against", "BROCK", "CARL")
+                        .param("sort", "winrate:asc", "games"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.battles").value(10))
+                .andExpect(jsonPath("$.sort[0]").value("winrate:asc"))
+                .andExpect(jsonPath("$.sort[2]").value("brawler:asc"))
                 .andExpect(jsonPath("$.brawlers[0].brawler").value("COLT"))
                 .andExpect(jsonPath("$.brawlers[0].games").value(5))
                 .andExpect(jsonPath("$.brawlers[0].winrate").value(80.0))
@@ -57,23 +61,28 @@ class AnalysisControllerTest {
                 List.of(), 100000, null, List.of(), List.of(),
                 "20261001T000000.000Z", null, 50);
         BrawlerInput expectedInput = new BrawlerInput(List.of("SHELLY"), List.of("BROCK", "CARL"));
-        verify(analysisService).analyzeBrawlers(expectedFilter, expectedInput, 5);
+        // The name is added at the end, and games uses its default direction
+        List<SortOrder> expectedSort = List.of(
+                new SortOrder(BrawlerSort.WINRATE, SortDirection.ASC),
+                new SortOrder(BrawlerSort.GAMES, SortDirection.DESC),
+                new SortOrder(BrawlerSort.BRAWLER, SortDirection.ASC));
+        verify(analysisService).analyzeBrawlers(expectedFilter, expectedInput, 5, expectedSort);
     }
 
     @Test
     void allPlayersNeedsNoTags() throws Exception {
-        when(analysisService.analyzeBrawlers(any(), any(), anyInt()))
-                .thenReturn(new BrawlerAnalysisResponse(0, List.of()));
+        when(analysisService.analyzeBrawlers(any(), any(), anyInt(), any()))
+                .thenReturn(new BrawlerAnalysisResponse(0, List.of("games:desc", "brawler:asc"), List.of()));
 
         mockMvc.perform(get("/analysis/brawlers").param("allPlayers", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.battles").value(0));
 
-        // Without other parameters: no filters, no with/against and minGames 1
+        // Without other parameters: no filters, no with/against, minGames 1 and the default sort
         verify(analysisService).analyzeBrawlers(
                 new BattleFilter(List.of(), true, List.of(), List.of(), null, null,
                         List.of(), List.of(), null, null, null),
-                BrawlerInput.NONE, 1);
+                BrawlerInput.NONE, 1, BrawlerSorting.resolve(null));
     }
 
     @Test
@@ -100,7 +109,7 @@ class AnalysisControllerTest {
                         .param("battleTypes", "trophyRoad"))
                 .andExpect(status().isBadRequest());
 
-        verify(analysisService, never()).analyzeBrawlers(any(), any(), anyInt());
+        verify(analysisService, never()).analyzeBrawlers(any(), any(), anyInt(), any());
     }
 
     @Test
@@ -121,8 +130,38 @@ class AnalysisControllerTest {
     }
 
     @Test
+    void returns400WhenTheSortFieldIsUnknown() throws Exception {
+        mockMvc.perform(get("/analysis/brawlers")
+                        .param("allPlayers", "true")
+                        .param("sort", "kills"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("kills")))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("winrate")));
+
+        verifyNoInteractions(analysisService);
+    }
+
+    @Test
+    void returns400WhenTheSortDirectionIsInvalid() throws Exception {
+        mockMvc.perform(get("/analysis/brawlers")
+                        .param("allPlayers", "true")
+                        .param("sort", "winrate:up"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("asc")));
+    }
+
+    @Test
+    void returns400WhenASortFieldIsRepeated() throws Exception {
+        mockMvc.perform(get("/analysis/brawlers")
+                        .param("allPlayers", "true")
+                        .param("sort", "winrate", "winrate:asc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("winrate")));
+    }
+
+    @Test
     void returns404WhenAPlayerIsNotRegistered() throws Exception {
-        when(analysisService.analyzeBrawlers(any(), any(), anyInt()))
+        when(analysisService.analyzeBrawlers(any(), any(), anyInt(), any()))
                 .thenThrow(new NoSuchElementException("Players not registered: #2VU8PGCC"));
 
         mockMvc.perform(get("/analysis/brawlers").param("players", "2VU8PGCC"))

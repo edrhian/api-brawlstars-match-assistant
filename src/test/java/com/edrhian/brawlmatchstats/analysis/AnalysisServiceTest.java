@@ -106,6 +106,26 @@ class AnalysisServiceTest {
                 .hasMessageContaining("#A");
     }
 
+    @Test
+    void sortsTheBrawlersWithTheGivenOrder() {
+        BrawlerAnalysisResponse response = service.analyzeBrawlers(
+                FILTER, BrawlerInput.NONE, 1, BrawlerSorting.resolve(List.of("winrate")));
+
+        // The best winrate first, and the name breaks the ties
+        assertThat(response.brawlers()).extracting(BrawlerStatsDto::brawler).containsExactly(
+                "DARRYL", "SHELLY", "BYRON", "CARL", "COLT", "SPIKE", "AMBER", "BROCK");
+        assertThat(response.sort()).containsExactly("winrate:desc", "brawler:asc");
+    }
+
+    @Test
+    void withoutSortTheResponseShowsTheDefaultOrder() {
+        BrawlerAnalysisResponse response = service.analyzeBrawlers(FILTER, BrawlerInput.NONE, 1);
+
+        assertThat(response.sort()).containsExactly("games:desc", "brawler:asc");
+        assertThat(response.brawlers()).extracting(BrawlerStatsDto::brawler).containsExactly(
+                "BYRON", "CARL", "COLT", "SPIKE", "AMBER", "BROCK", "DARRYL", "SHELLY");
+    }
+
     private static BrawlerStatsDto stat(BrawlerAnalysisResponse response, String brawler) {
         return response.brawlers().stream().filter(stat -> stat.brawler().equals(brawler)).findFirst().orElseThrow();
     }

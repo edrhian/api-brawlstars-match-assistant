@@ -31,14 +31,25 @@ public class AnalysisService {
     }
 
     /**
-     * Winrate of each Brawler, seen from its own team (an enemy win is a win for the enemy Brawlers).
-     * "with" and "against" are applied after the limit, to the filtered battles.
+     * Same as the next method, with the default order (most played first, then name).
      */
     public BrawlerAnalysisResponse analyzeBrawlers(BattleFilter filter, BrawlerInput input, int minGames) {
+        return analyzeBrawlers(filter, input, minGames, BrawlerSorting.resolve(null));
+    }
+
+    /**
+     * Winrate of each Brawler, seen from its own team (an enemy win is a win for the enemy Brawlers).
+     * "with" and "against" are applied after the limit, to the filtered battles.
+     *
+     * @param sort the criteria already checked by BrawlerSorting.resolve
+     */
+    public BrawlerAnalysisResponse analyzeBrawlers(BattleFilter filter, BrawlerInput input, int minGames,
+                                                   List<SortOrder> sort) {
         List<Battle> battles = findBattles(filter);
         return new BrawlerAnalysisResponse(
                 battles.size(),
-                BrawlerStatsCalculator.brawlers(battles, input, minGames));
+                sort.stream().map(SortOrder::asText).toList(),
+                BrawlerStatsCalculator.brawlers(battles, input, minGames, BrawlerSorting.comparator(sort)));
     }
 
     /**

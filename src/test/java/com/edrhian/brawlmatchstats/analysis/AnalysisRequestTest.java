@@ -178,6 +178,7 @@ class AnalysisRequestTest {
         private Integer minGames;
         private List<String> with;
         private List<String> against;
+        private List<String> sort;
 
         static Request players(String... tags) {
             Request request = new Request();
@@ -242,9 +243,38 @@ class AnalysisRequestTest {
             return this;
         }
 
+        Request sort(String... values) {
+            this.sort = Arrays.asList(values);
+            return this;
+        }
+
+        // ---------- sort ----------
+
+        @Test
+        void sortIsOptionalAndDefaultsToMostPlayed() {
+            List<SortOrder> sort = Request.players("#A").build().toSort();
+
+            assertThat(sort).extracting(SortOrder::asText).containsExactly("games:desc", "brawler:asc");
+        }
+
+        @Test
+        void readsTheSortValuesInOrder() {
+            List<SortOrder> sort = Request.players("#A").sort("winrate:asc", "games").build().toSort();
+
+            assertThat(sort).extracting(SortOrder::asText)
+                    .containsExactly("winrate:asc", "games:desc", "brawler:asc");
+        }
+
+        @Test
+        void rejectsAnInvalidSort() {
+            assertThatThrownBy(() -> Request.players("#A").sort("kills").build().toSort())
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("kills");
+        }
+
         AnalysisRequest build() {
             return new AnalysisRequest(players, allPlayers, types, ranks, trophiesMin, trophiesMax,
-                    modes, maps, from, to, limit, minGames, with, against);
+                    modes, maps, from, to, limit, minGames, with, against, sort);
         }
     }
 }

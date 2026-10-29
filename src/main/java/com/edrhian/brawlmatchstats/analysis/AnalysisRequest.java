@@ -28,7 +28,8 @@ public record AnalysisRequest(
         Integer limit,
         Integer minGames,
         List<String> with,
-        List<String> against
+        List<String> against,
+        List<String> sort
 ) {
 
     private static final int MAX_WITH = 2;     // a team has 3 brawlers and one of them is the one we count
@@ -71,6 +72,11 @@ public record AnalysisRequest(
         return new BrawlerInput(
                 cleanBrawlers(with, MAX_WITH, "with"),
                 cleanBrawlers(against, MAX_AGAINST, "against"));
+    }
+
+    // The order of the results: the sort values, checked, plus the default and the final name criteria
+    public List<SortOrder> toSort() {
+        return BrawlerSorting.resolve(sort);
     }
 
     // Minimum number of games a Brawler needs to appear in the results (default 1)
