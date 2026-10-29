@@ -3,6 +3,7 @@ package com.edrhian.brawlmatchstats.analysis;
 import com.edrhian.brawlmatchstats.battle.Battle;
 import org.junit.jupiter.api.Test;
 
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -161,6 +162,17 @@ class BrawlerStatsCalculatorTest {
                 battles, new BrawlerInput(List.of("SHELLY"), List.of("BROCK")), 1);
 
         assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly("COLT", "SPIKE");
+    }
+
+    @Test
+    void usesTheGivenOrder() {
+        Comparator<BrawlerStatsDto> byWinrate = BrawlerSorting.comparator(BrawlerSorting.resolve(List.of("winrate")));
+
+        List<BrawlerStatsDto> stats = BrawlerStatsCalculator.brawlers(battles, BrawlerInput.NONE, 1, byWinrate);
+
+        // The best winrate first, and the name breaks the ties
+        assertThat(stats).extracting(BrawlerStatsDto::brawler).containsExactly(
+                "DARRYL", "SHELLY", "BYRON", "CARL", "COLT", "SPIKE", "AMBER", "BROCK");
     }
 
     // ---------- Helpers ----------

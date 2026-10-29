@@ -28,11 +28,19 @@ public final class BrawlerStatsCalculator {
     }
 
     /**
-     * @param input optional brawlers: "with" must be teammates and "against" must be in the other team.
-     *              The brawlers of "with" are not listed (they would be their own partner).
-     * @return most played first, alphabetical when there is a tie
+     * Same as the next method, with the default order (most played first, then name).
      */
     public static List<BrawlerStatsDto> brawlers(List<Battle> battles, BrawlerInput input, int minGames) {
+        return brawlers(battles, input, minGames, BrawlerSorting.comparator(BrawlerSorting.resolve(null)));
+    }
+
+    /**
+     * @param input optional brawlers: "with" must be teammates and "against" must be in the other team.
+     *              The brawlers of "with" are not listed (they would be their own partner).
+     * @param order how the result is sorted (see BrawlerSorting)
+     */
+    public static List<BrawlerStatsDto> brawlers(List<Battle> battles, BrawlerInput input, int minGames,
+                                                 Comparator<BrawlerStatsDto> order) {
         Map<String, Tally> tallies = new HashMap<>();
 
         for (Battle battle : battles) {
@@ -50,8 +58,7 @@ public final class BrawlerStatsCalculator {
                 .map(entry -> BrawlerStatsDto.of(entry.getKey(),
                         entry.getValue().wins, entry.getValue().losses, entry.getValue().draws))
                 .filter(stats -> stats.games() >= minGames)
-                .sorted(Comparator.comparingInt(BrawlerStatsDto::games).reversed()
-                        .thenComparing(BrawlerStatsDto::brawler))
+                .sorted(order)
                 .toList();
     }
 
