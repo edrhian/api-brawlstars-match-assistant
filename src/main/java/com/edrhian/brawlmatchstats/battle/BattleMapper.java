@@ -31,7 +31,13 @@ public final class BattleMapper {
                 battle.getEnemy3(),
                 battle.getEnemy3Brawler(),
                 battle.getBattleResult(),
-                battle.getFetchedAt()
+                battle.getFetchedAt(),
+                battle.getAlly1Ban(),
+                battle.getAlly2Ban(),
+                battle.getAlly3Ban(),
+                battle.getEnemy1Ban(),
+                battle.getEnemy2Ban(),
+                battle.getEnemy3Ban()
         );
     }
 
@@ -62,6 +68,12 @@ public final class BattleMapper {
         battle.setEnemy3Brawler(dto.enemy3Brawler());
         battle.setBattleResult(dto.battleResult());
         battle.setFetchedAt(dto.fetchedAt());
+        battle.setAlly1Ban(dto.ally1Ban());
+        battle.setAlly2Ban(dto.ally2Ban());
+        battle.setAlly3Ban(dto.ally3Ban());
+        battle.setEnemy1Ban(dto.enemy1Ban());
+        battle.setEnemy2Ban(dto.enemy2Ban());
+        battle.setEnemy3Ban(dto.enemy3Ban());
         return battle;
     }
 }

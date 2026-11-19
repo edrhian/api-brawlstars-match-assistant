@@ -26,10 +26,14 @@ public record BrawlStarsBattleLogResponse(List<Item> items) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Participant(String tag, String name, Brawler brawler) {
+    public record Participant(String tag, String name, Brawler brawler, BannedBrawler bannedBrawler) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Brawler(String name) {
+    }
+
+    // The brawler a player banned in the draft phase (the API does not send it in battles without draft)
+    public record BannedBrawler(String name) {
     }
 }

@@ -160,6 +160,14 @@ public class BattleService {
         battle.setEnemy3(tagOf(at(enemyTeam, 2)));
         battle.setEnemy3Brawler(brawlerOf(at(enemyTeam, 2)));
 
+        // The brawler each player banned (null when the API does not send it)
+        battle.setAlly1Ban(banOf(me));
+        battle.setAlly2Ban(banOf(at(mates, 0)));
+        battle.setAlly3Ban(banOf(at(mates, 1)));
+        battle.setEnemy1Ban(banOf(at(enemyTeam, 0)));
+        battle.setEnemy2Ban(banOf(at(enemyTeam, 1)));
+        battle.setEnemy3Ban(banOf(at(enemyTeam, 2)));
+
         // The ID uses the 6 tags, so it must be built after all the slots are filled
         battle.setId(Battle.buildId(item.battleTime(),
                 battle.getAlly1(), battle.getAlly2(), battle.getAlly3(),
@@ -192,5 +200,9 @@ public class BattleService {
 
     private String brawlerOf(Participant participant) {
         return participant == null || participant.brawler() == null ? null : participant.brawler().name();
+    }
+
+    private String banOf(Participant participant) {
+        return participant == null || participant.bannedBrawler() == null ? null : participant.bannedBrawler().name();
     }
 }

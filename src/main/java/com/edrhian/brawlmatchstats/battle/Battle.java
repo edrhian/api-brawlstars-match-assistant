@@ -1,12 +1,7 @@
 package com.edrhian.brawlmatchstats.battle;
 
 import com.edrhian.brawlmatchstats.shared.BattleType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Index;
+import jakarta.persistence.*;
 
 /**
  * One battle seen from the point of view of Ally 1 (the tracked player).
@@ -71,6 +66,26 @@ public class Battle {
 
     // When we stored the battle, example: 2026-10-07T11:00:39
     private String fetchedAt;
+
+    // Brawler banned by each player in the draft phase. The ban stays in the slot of the player who made it.
+    // null = no ban data (older battles, or battle types without draft)
+    @Column(name = "ally1_ban")
+    private String ally1Ban;
+
+    @Column(name = "ally2_ban")
+    private String ally2Ban;
+
+    @Column(name = "ally3_ban")
+    private String ally3Ban;
+
+    @Column(name = "enemy1_ban")
+    private String enemy1Ban;
+
+    @Column(name = "enemy2_ban")
+    private String enemy2Ban;
+
+    @Column(name = "enemy3_ban")
+    private String enemy3Ban;
 
     public Battle() {
         // JPA needs an empty constructor
@@ -257,5 +272,53 @@ public class Battle {
 
     public void setFetchedAt(String fetchedAt) {
         this.fetchedAt = fetchedAt;
+    }
+
+    public String getAlly1Ban() {
+        return ally1Ban;
+    }
+
+    public void setAlly1Ban(String ally1Ban) {
+        this.ally1Ban = ally1Ban;
+    }
+
+    public String getAlly2Ban() {
+        return ally2Ban;
+    }
+
+    public void setAlly2Ban(String ally2Ban) {
+        this.ally2Ban = ally2Ban;
+    }
+
+    public String getAlly3Ban() {
+        return ally3Ban;
+    }
+
+    public void setAlly3Ban(String ally3Ban) {
+        this.ally3Ban = ally3Ban;
+    }
+
+    public String getEnemy1Ban() {
+        return enemy1Ban;
+    }
+
+    public void setEnemy1Ban(String enemy1Ban) {
+        this.enemy1Ban = enemy1Ban;
+    }
+
+    public String getEnemy2Ban() {
+        return enemy2Ban;
+    }
+
+    public void setEnemy2Ban(String enemy2Ban) {
+        this.enemy2Ban = enemy2Ban;
+    }
+
+    public String getEnemy3Ban() {
+        return enemy3Ban;
+    }
+
+    public void setEnemy3Ban(String enemy3Ban) {
+        this.enemy3Ban = enemy3Ban;
     }
 }

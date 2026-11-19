@@ -39,6 +39,9 @@ class BattleRepositoryTest {
         assertThat(found.getEnemy3Brawler()).isEqualTo("BYRON");
         assertThat(found.getBattleResult()).isEqualTo("victory");
         assertThat(found.getFetchedAt()).isEqualTo("2026-10-07T11:00:39");
+        assertThat(found.getAlly1Ban()).isEqualTo("CHUCK");
+        assertThat(found.getEnemy3Ban()).isEqualTo("MANDY");
+        assertThat(found.getAlly2Ban()).isNull();
     }
 
     private Battle createBattle(String battleTime, String ally1, BattleType type) {
@@ -64,6 +67,8 @@ class BattleRepositoryTest {
         battle.setEnemy3Brawler("BYRON");
         battle.setBattleResult("victory");
         battle.setFetchedAt("2026-10-07T11:00:39");
+        battle.setAlly1Ban("CHUCK");
+        battle.setEnemy3Ban("MANDY");
         return battle;
     }
 }

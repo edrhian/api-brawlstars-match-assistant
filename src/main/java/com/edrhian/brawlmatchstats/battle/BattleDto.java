@@ -27,6 +27,12 @@ public record BattleDto(
         String enemy3,
         String enemy3Brawler,
         String battleResult,
-        String fetchedAt
+        String fetchedAt,
+        String ally1Ban,
+        String ally2Ban,
+        String ally3Ban,
+        String enemy1Ban,
+        String enemy2Ban,
+        String enemy3Ban
 ) {
 }

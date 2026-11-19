@@ -1,5 +1,6 @@
 package com.edrhian.brawlmatchstats.battle;
 
+import com.edrhian.brawlmatchstats.brawlstars.BrawlStarsBattleLogResponse.BannedBrawler;
 import com.edrhian.brawlmatchstats.brawlstars.BrawlStarsBattleLogResponse.BattleDetails;
 import com.edrhian.brawlmatchstats.brawlstars.BrawlStarsBattleLogResponse.Brawler;
 import com.edrhian.brawlmatchstats.brawlstars.BrawlStarsBattleLogResponse.Event;
@@ -118,6 +119,39 @@ class BattleServiceTest {
         int saved = service.fetchAndStoreBattles(PLAYER_TAG);
 
         assertThat(saved).isEqualTo(1);
+    }
+
+    @Test
+    void savesTheBanOfEachPlayerInItsSlot() {
+        givenTrackedPlayer(true, BattleType.soloRanked);
+        givenBattleLog(item("soloRanked", teamsWithBans()));
+
+        service.fetchAndStoreBattles(PLAYER_TAG);
+
+        Battle battle = savedBattle();
+        // The tracked player is listed second in the API team, but it is Ally 1 with its own ban
+        assertThat(battle.getAlly1Ban()).isEqualTo("CHUCK");
+        assertThat(battle.getAlly2Ban()).isEqualTo("VINCE");
+        assertThat(battle.getAlly3Ban()).isEqualTo("MR. P");
+        assertThat(battle.getEnemy1Ban()).isEqualTo("COLETTE");
+        assertThat(battle.getEnemy2Ban()).isEqualTo("MELODIE");
+        assertThat(battle.getEnemy3Ban()).isEqualTo("MANDY");
+    }
+
+    @Test
+    void bansAreNullWhenTheApiSendsNone() {
+        givenTrackedPlayer(true, BattleType.soloRanked);
+        givenBattleLog(item("soloRanked", defaultTeams()));
+
+        service.fetchAndStoreBattles(PLAYER_TAG);
+
+        Battle battle = savedBattle();
+        assertThat(battle.getAlly1Ban()).isNull();
+        assertThat(battle.getAlly2Ban()).isNull();
+        assertThat(battle.getAlly3Ban()).isNull();
+        assertThat(battle.getEnemy1Ban()).isNull();
+        assertThat(battle.getEnemy2Ban()).isNull();
+        assertThat(battle.getEnemy3Ban()).isNull();
     }
 
     // ---------- Filters ----------
@@ -262,6 +296,21 @@ class BattleServiceTest {
     }
 
     private static Participant participant(String tag, String brawler) {
-        return new Participant(tag, "name", new Brawler(brawler));
+        return participant(tag, brawler, null);
+    }
+
+    private static Participant participant(String tag, String brawler, String ban) {
+        return new Participant(tag, "name", new Brawler(brawler), ban == null ? null : new BannedBrawler(ban));
+    }
+
+    // Same players as defaultTeams(), every player with the ban of the real battle log sample
+    private static List<List<Participant>> teamsWithBans() {
+        return List.of(
+                List.of(participant(MATE_TAG, "COLT", "VINCE"),
+                        participant(PLAYER_TAG, "DARRYL", "CHUCK"),
+                        participant("#P2J88GQG", "AMBER", "MR. P")),
+                List.of(participant(ENEMY_TAG, "BROCK", "COLETTE"),
+                        participant("#2R0P8LPR9", "CARL", "MELODIE"),
+                        participant("#Y8Q8UPCGV", "BYRON", "MANDY")));
     }
 }
