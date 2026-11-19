@@ -141,4 +141,36 @@ class AnalysisServiceTest {
         battle.setEnemy3Brawler(e3);
         return battle;
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void analyzeBansCountsTheBansOfTheFilteredBattles() {
+        Battle withBan = new Battle();
+        withBan.setAlly1Ban("MELODIE");
+        when(battleRepository.findAll(any(Specification.class))).thenReturn(List.of(withBan, new Battle()));
+
+        BanAnalysisResponse response = service.analyzeBans(FILTER);
+
+        assertThat(response.battles()).isEqualTo(2);
+        assertThat(response.battlesWithBans()).isEqualTo(1);
+        assertThat(response.bans()).hasSize(1);
+        assertThat(response.bans().get(0).brawler()).isEqualTo("MELODIE");
+        assertThat(response.bans().get(0).banrate()).isEqualTo(100.0);
+    }
+
+    @Test
+    void analyzeBansWithAllPlayersDoesNotCheckRegisteredPlayers() {
+        service.analyzeBans(ALL_PLAYERS);
+
+        verify(playerRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void analyzeBansThrowsWhenAPlayerIsNotRegistered() {
+        when(playerRepository.findAllById(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.analyzeBans(FILTER))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("#A");
+    }
 }

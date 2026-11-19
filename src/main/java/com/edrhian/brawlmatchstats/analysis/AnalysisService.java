@@ -53,6 +53,14 @@ public class AnalysisService {
     }
 
     /**
+     * Banrate of each banned brawler in the filtered battles. All the filters work the same way as in
+     * the brawler analysis (players, battle type, dates, trophies, rank, map or mode and the limit).
+     */
+    public BanAnalysisResponse analyzeBans(BattleFilter filter) {
+        return BanStatsCalculator.bans(findBattles(filter));
+    }
+
+    /**
      * Existing values of the database for some players (all their battles, without other filters).
      *
      * @param players already normalized tags (ignored when allPlayers is true)
