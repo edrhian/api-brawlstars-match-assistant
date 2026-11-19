@@ -161,6 +161,45 @@ class AnalysisRequestTest {
                 .hasMessageContaining("against");
     }
 
+    // ---------- ban analysis ----------
+
+    @Test
+    void banFilterIsTheSameAsTheNormalFilter() {
+        AnalysisRequest request = Request.players("2vu8pgcc").types(BattleType.soloRanked).limit(50).build();
+
+        assertThat(request.toBanFilter()).isEqualTo(request.toFilter());
+    }
+
+    @Test
+    void banFilterAcceptsAllPlayers() {
+        BattleFilter filter = new Request().allPlayers(true).build().toBanFilter();
+
+        assertThat(filter.allPlayers()).isTrue();
+    }
+
+    @Test
+    void banFilterRejectsTheBrawlerParameters() {
+        assertThatThrownBy(() -> Request.players("#A").with("SHELLY").build().toBanFilter())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("with");
+        assertThatThrownBy(() -> Request.players("#A").against("BROCK").build().toBanFilter())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("against");
+        assertThatThrownBy(() -> Request.players("#A").sort("winrate").build().toBanFilter())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sort");
+        assertThatThrownBy(() -> Request.players("#A").minGames(5).build().toBanFilter())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("minGames");
+    }
+
+    @Test
+    void banFilterIgnoresEmptyBrawlerParameters() {
+        BattleFilter filter = Request.players("#A").with(" ").sort("").build().toBanFilter();
+
+        assertThat(filter.players()).containsExactly("#A");
+    }
+
     // ---------- Small builder, so each test only writes what it needs ----------
 
     private static class Request {

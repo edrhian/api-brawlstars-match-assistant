@@ -74,6 +74,26 @@ public record AnalysisRequest(
                 cleanBrawlers(against, MAX_AGAINST, "against"));
     }
 
+    /**
+     * The filter of the ban analysis. minGames, with, against and sort only make sense for the brawler
+     * analysis, so they are rejected instead of being ignored without telling.
+     */
+    public BattleFilter toBanFilter() {
+        if (minGames != null) {
+            throw new IllegalArgumentException("Parameter 'minGames' is not used by the ban analysis");
+        }
+        rejectIfGiven("with", with);
+        rejectIfGiven("against", against);
+        rejectIfGiven("sort", sort);
+        return toFilter();
+    }
+
+    private static void rejectIfGiven(String parameter, List<String> values) {
+        if (!cleanText(values).isEmpty()) {
+            throw new IllegalArgumentException("Parameter '" + parameter + "' is not used by the ban analysis");
+        }
+    }
+
     // The order of the results: the sort values, checked, plus the default and the final name criteria
     public List<SortOrder> toSort() {
         return BrawlerSorting.resolve(sort);

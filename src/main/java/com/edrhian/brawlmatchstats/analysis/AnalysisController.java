@@ -30,6 +30,15 @@ public class AnalysisController {
                 request.toFilter(), request.toInput(), request.minGamesOrDefault(), request.toSort());
     }
 
+    /**
+     * Banrate of every banned brawler. It accepts the same filters as the brawler analysis,
+     * except minGames, with, against and sort (they return a 400 error).
+     */
+    @GetMapping("/bans")
+    public BanAnalysisResponse bans(AnalysisRequest request) {
+        return analysisService.analyzeBans(request.toBanFilter());
+    }
+
     // Values that exist in the database, to fill the filter selectors
     @GetMapping("/filter-options")
     public FilterOptionsResponse filterOptions(@RequestParam(required = false) List<String> players,

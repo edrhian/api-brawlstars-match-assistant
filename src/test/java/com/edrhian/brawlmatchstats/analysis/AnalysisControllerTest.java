@@ -209,4 +209,78 @@ class AnalysisControllerTest {
 
         verify(analysisService, never()).getFilterOptions(any(), anyBoolean());
     }
+
+    // ---------- bans ----------
+
+    @Test
+    void bansReadsTheFilters() throws Exception {
+        when(analysisService.analyzeBans(any())).thenReturn(new BanAnalysisResponse(
+                120, 85, Confidence.MEDIUM, List.of(BanStatsDto.of("MELODIE", 40, 38, 85))));
+
+        mockMvc.perform(get("/analysis/bans")
+                        .param("players", "2VU8PGCC")
+                        .param("battleTypes", "soloRanked")
+                        .param("from", "2026-11-18")
+                        .param("limit", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.battles").value(120))
+                .andExpect(jsonPath("$.battlesWithBans").value(85))
+                .andExpect(jsonPath("$.confidence").value("MEDIUM"))
+                .andExpect(jsonPath("$.bans[0].brawler").value("MELODIE"))
+                .andExpect(jsonPath("$.bans[0].bans").value(40))
+                .andExpect(jsonPath("$.bans[0].bannedBattles").value(38))
+                .andExpect(jsonPath("$.bans[0].banrate").value(44.7))
+                .andExpect(jsonPath("$.bans[0].wilsonLower").value(34.6))
+                .andExpect(jsonPath("$.bans[0].wilsonUpper").value(55.3));
+
+        verify(analysisService).analyzeBans(new BattleFilter(
+                List.of("#2VU8PGCC"), false, List.of(BattleType.soloRanked), List.of(), null, null,
+                List.of(), List.of(), "20261118T000000.000Z", null, 100));
+    }
+
+    @Test
+    void bansAcceptsAllPlayers() throws Exception {
+        when(analysisService.analyzeBans(any()))
+                .thenReturn(new BanAnalysisResponse(0, 0, Confidence.INSUFFICIENT, List.of()));
+
+        mockMvc.perform(get("/analysis/bans").param("allPlayers", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bans").isEmpty());
+
+        verify(analysisService).analyzeBans(new BattleFilter(
+                List.of(), true, List.of(), List.of(), null, null, List.of(), List.of(), null, null, null));
+    }
+
+    @Test
+    void bansReturns400WithoutPlayers() throws Exception {
+        mockMvc.perform(get("/analysis/bans"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(analysisService);
+    }
+
+    @Test
+    void bansRejectsTheBrawlerParameters() throws Exception {
+        String[][] parameters = {{"with", "SHELLY"}, {"against", "BROCK"}, {"sort", "winrate"}, {"minGames", "5"}};
+
+        for (String[] parameter : parameters) {
+            mockMvc.perform(get("/analysis/bans")
+                            .param("allPlayers", "true")
+                            .param(parameter[0], parameter[1]))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString(parameter[0])));
+        }
+
+        verifyNoInteractions(analysisService);
+    }
+
+    @Test
+    void bansReturns404WhenAPlayerIsNotRegistered() throws Exception {
+        when(analysisService.analyzeBans(any()))
+                .thenThrow(new NoSuchElementException("Players not registered: #2VU8PGCC"));
+
+        mockMvc.perform(get("/analysis/bans").param("players", "2VU8PGCC"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Players not registered: #2VU8PGCC"));
+    }
 }
